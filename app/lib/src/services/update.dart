@@ -8,7 +8,7 @@ class GithubRelease {
     required this.tag,
     required this.htmlUrl,
     required this.notes,
-    required this.assets,
+    required this.downloadUrl,
   });
 
   /// Версия без префикса `v` и суффикса (`alpha`, `beta`).
@@ -17,15 +17,9 @@ class GithubRelease {
   final String htmlUrl;
   final String notes;
 
-  /// Ключ — суффикс APK: `universal`, `arm64`, `arm32`, `x64`.
-  final Map<String, String> assets;
-
-  /// Ссылка на APK под архитектуру устройства. Если подходящего ассета нет,
-  /// возвращается universal — он есть всегда.
-  String downloadUrlFor(String abi) {
-    final key = GithubUpdate.assetKey(abi);
-    return assets[key] ?? assets['universal'] ?? htmlUrl;
-  }
+  /// Ссылка на единственный APK релиза (universal). Если ассета нет,
+  /// возвращается страница релиза — пользователь скачает вручную.
+  final String downloadUrl;
 }
 
 /// Проверка обновлений без Google Play: смотрим публичные релизы GitHub.
@@ -35,7 +29,7 @@ class GithubUpdate {
       'https://api.github.com/repos/$_repo/releases?per_page=1';
 
   /// Без авторизации. GitHub даёт 60 запросов в час с IP — проверка только
-  /// по кнопке и не чаще одного раза за сессию, этого хватает.
+  /// по кнопке, этого хватает.
   static Future<GithubRelease?> fetchLatest() async {
     final client = HttpClient()..findProxy = (_) => 'DIRECT';
     try {
@@ -65,29 +59,26 @@ class GithubUpdate {
     final tag = (json['tag_name'] as String?)?.trim() ?? '';
     final raw = tag.startsWith('v') ? tag.substring(1) : tag;
     final version = raw.split('-').first;
-    final assets = <String, String>{};
+    final htmlUrl = (json['html_url'] as String?) ?? '';
+
+    var downloadUrl = htmlUrl;
     for (final item in (json['assets'] as List<dynamic>?) ?? const []) {
       if (item is! Map) continue;
       final map = item.cast<String, dynamic>();
       final name = (map['name'] as String?)?.toLowerCase() ?? '';
       final url = map['browser_download_url'] as String?;
-      if (url == null) continue;
-      if (name.endsWith('-universal.apk')) {
-        assets['universal'] = url;
-      } else if (name.endsWith('-arm64.apk')) {
-        assets['arm64'] = url;
-      } else if (name.endsWith('-arm32.apk')) {
-        assets['arm32'] = url;
-      } else if (name.endsWith('-x64.apk')) {
-        assets['x64'] = url;
+      if (url != null && name.endsWith('-universal.apk')) {
+        downloadUrl = url;
+        break;
       }
     }
+
     return GithubRelease(
       version: version,
       tag: tag,
-      htmlUrl: (json['html_url'] as String?) ?? '',
+      htmlUrl: htmlUrl,
       notes: (json['body'] as String?)?.trim() ?? '',
-      assets: assets,
+      downloadUrl: downloadUrl,
     );
   }
 
@@ -99,14 +90,5 @@ class GithubUpdate {
     final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length < 10) return 0;
     return int.tryParse(digits.substring(0, 10)) ?? 0;
-  }
-
-  /// `Build.SUPPORTED_ABIS` из Android → ключ ассета.
-  static String assetKey(String abi) {
-    final value = abi.toLowerCase();
-    if (value.contains('arm64') || value.contains('aarch64')) return 'arm64';
-    if (value.contains('x86_64') || value.contains('amd64')) return 'x64';
-    if (value.contains('arm')) return 'arm32';
-    return 'universal';
   }
 }

@@ -126,9 +126,6 @@ class MainActivity : FlutterActivity() {
                     mapOf("status" to CurieBridge.status, "error" to CurieBridge.lastError)
                 )
 
-                // Для выбора split-APK при проверке обновлений на GitHub.
-                "abi" -> result.success(Build.SUPPORTED_ABIS.firstOrNull())
-
                 // ANDROID_ID: стабилен для пары «устройство + подпись приложения»,
                 // живёт после переустановки. В Dart из него выводится HWID через HMAC,
                 // само значение наружу не уходит.

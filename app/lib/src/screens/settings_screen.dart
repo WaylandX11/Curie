@@ -521,8 +521,7 @@ class _AboutTilesState extends State<_AboutTiles> {
         return;
       }
 
-      final abi = await Vpn.abi() ?? '';
-      final download = release.downloadUrlFor(abi);
+      final download = release.downloadUrl;
       if (!mounted) return;
       await showDialog<void>(
         context: context,

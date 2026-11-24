@@ -29,10 +29,21 @@ android {
         versionName = flutter.versionName
     }
 
+    // Общий ключ подписи для локальных сборок и CI. Без него APK с GitHub
+    // не встаёт поверх уже установленного локальной сборкой: подписи разные.
+    // Файл в .gitignore; в CI его кладёт секрет CURIE_DEBUG_KEYSTORE_BASE64.
+    val sharedDebugKey = file("debug.keystore")
+    if (sharedDebugKey.exists()) {
+        signingConfigs {
+            getByName("debug") {
+                storeFile = sharedDebugKey
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Пока подписываем тем же ключом, чтобы обновления с GitHub ставились.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

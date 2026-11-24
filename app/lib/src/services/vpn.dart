@@ -73,17 +73,6 @@ class Vpn {
 
   static Future<void> disconnect() => _channel.invokeMethod<void>('disconnect');
 
-  /// Первая ABI из `Build.SUPPORTED_ABIS` — нужна, чтобы предложить правильный
-  /// split-APK при проверке обновлений. На не-Android возвращает null.
-  static Future<String?> abi() async {
-    if (!isSupported) return null;
-    try {
-      return await _channel.invokeMethod<String>('abi');
-    } on Object {
-      return null;
-    }
-  }
-
   static VpnStatus _statusFromName(String? name) => switch (name) {
     'connecting' => VpnStatus.connecting,
     'connected' => VpnStatus.connected,

@@ -59,6 +59,16 @@ jobs:
       # NDK не нужен: в проекте нет своего нативного кода, libXray.aar уже
       # содержит готовые .so. Раньше этот шаг падал на sdkmanager в Actions.
 
+      - name: Use shared signing key
+        if: steps.detect.outputs.ok == 'yes'
+        run: |
+          set -euo pipefail
+          test -n "$CURIE_DEBUG_KEYSTORE_BASE64" || { echo "Секрет CURIE_DEBUG_KEYSTORE_BASE64 не задан"; exit 1; }
+          printf '%s' "$CURIE_DEBUG_KEYSTORE_BASE64" | base64 -d > app/android/app/debug.keystore
+          test -s app/android/app/debug.keystore
+        env:
+          CURIE_DEBUG_KEYSTORE_BASE64: ${{ secrets.CURIE_DEBUG_KEYSTORE_BASE64 }}
+
       - name: Analyze and test
         if: steps.detect.outputs.ok == 'yes'
         working-directory: app

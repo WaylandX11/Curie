@@ -51,23 +51,27 @@ jobs:
           flutter analyze
           flutter test
 
-      - name: Build release APKs
-        working-directory: app
-        run: |
-          flutter build apk --release
-          flutter build apk --release --split-per-abi
-
-      - name: Prepare release assets
+      - name: Use shared signing key
         run: |
           set -euo pipefail
-          out="app/build/app/outputs/flutter-apk"
-          base="curie-${GITHUB_REF_NAME}"
-          cp "$out/app-release.apk" "${base}-universal.apk"
-          cp "$out/app-arm64-v8a-release.apk" "${base}-arm64.apk"
-          cp "$out/app-armeabi-v7a-release.apk" "${base}-arm32.apk"
-          cp "$out/app-x86_64-release.apk" "${base}-x64.apk"
-          for f in curie-*.apk; do sha256sum "$f" > "$f.sha256"; done
-          ls -lh curie-*.apk
+          test -n "$CURIE_DEBUG_KEYSTORE_BASE64" || { echo "Секрет CURIE_DEBUG_KEYSTORE_BASE64 не задан"; exit 1; }
+          printf '%s' "$CURIE_DEBUG_KEYSTORE_BASE64" | base64 -d > app/android/app/debug.keystore
+          test -s app/android/app/debug.keystore
+        env:
+          CURIE_DEBUG_KEYSTORE_BASE64: ${{ secrets.CURIE_DEBUG_KEYSTORE_BASE64 }}
+
+      - name: Build release APK
+        working-directory: app
+        run: flutter build apk --release
+
+      - name: Prepare release asset
+        run: |
+          set -euo pipefail
+          apk="app/build/app/outputs/flutter-apk/app-release.apk"
+          name="curie-${GITHUB_REF_NAME}-universal.apk"
+          cp "$apk" "$name"
+          sha256sum "$name" > "$name.sha256"
+          ls -lh "$name"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
