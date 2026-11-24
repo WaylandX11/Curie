@@ -33,6 +33,8 @@
   `arm32`/`x64`).
 - Публикация стала явной: `tag-release.ps1` без `-Publish` только проверяет тэг,
   а workflow релиза прикрепляет сразу четыре APK вместо одного.
+- Отключён `lintVitalAnalyzeRelease`: AGP падал на `image_picker_android` из-за бага
+  `CommentDetector`. Анализ и тесты Dart всё равно прогоняются в CI.
 
 ## [26.11.24.1230] — подготовка публикации
 

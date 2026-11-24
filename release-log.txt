@@ -1,0 +1,601 @@
+﻿2026-11-24T11:44:57.2456032Z Current runner version: '2.338.2'
+2026-11-24T11:44:57.2473194Z ##[group]Runner Image Provisioner
+2026-11-24T11:44:57.2473744Z Hosted Compute Agent
+2026-11-24T11:44:57.2474179Z Version: 20261111.635
+2026-11-24T11:44:57.2474596Z Commit: b8a594ea514ff44cadb5342986c68b1eac6e22ed
+2026-11-24T11:44:57.2475020Z Build Date: 2026-11-11T01:49:01Z
+2026-11-24T11:44:57.2475729Z Worker ID: {9a204a90-62cb-4b90-a4ca-90f08e50228e}
+2026-11-24T11:44:57.2476154Z Region: centralus
+2026-11-24T11:44:57.2476519Z Cloud: Azure
+2026-11-24T11:44:57.2476896Z ##[endgroup]
+2026-11-24T11:44:57.2477731Z ##[group]Operating System
+2026-11-24T11:44:57.2478168Z Ubuntu
+2026-11-24T11:44:57.2478487Z 26.04.1
+2026-11-24T11:44:57.2478821Z LTS
+2026-11-24T11:44:57.2479200Z ##[endgroup]
+2026-11-24T11:44:57.2479535Z ##[group]Runner Image
+2026-11-24T11:44:57.2479985Z Image: ubuntu-26.04
+2026-11-24T11:44:57.2480332Z Version: 20261116.202.1
+2026-11-24T11:44:57.2481115Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261116.202/images/ubuntu/Ubuntu2604-Readme.md
+2026-11-24T11:44:57.2482038Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261116.202
+2026-11-24T11:44:57.2482635Z ##[endgroup]
+2026-11-24T11:44:57.2483300Z ##[group]GITHUB_TOKEN Permissions
+2026-11-24T11:44:57.2484535Z Contents: write
+2026-11-24T11:44:57.2484902Z Metadata: read
+2026-11-24T11:44:57.2485692Z ##[endgroup]
+2026-11-24T11:44:57.2487109Z Secret source: Actions
+2026-11-24T11:44:57.2487635Z Cache mode: write
+2026-11-24T11:44:57.2488139Z Prepare workflow directory
+2026-11-24T11:44:57.2729384Z Prepare all required actions
+2026-11-24T11:44:57.2761083Z Getting action download info
+2026-11-24T11:44:57.4986287Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-24T11:44:57.5928345Z Download action repository 'actions/setup-java@v4' (SHA:cf277c60eb25467037889841efdb72551f06f6c3)
+2026-11-24T11:44:58.0229067Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-11-24T11:44:58.2759463Z Download action repository 'softprops/action-gh-release@v2' (SHA:3bb12739c298aeb8a4eeaf626c5b8d85266b0e65)
+2026-11-24T11:44:58.6387155Z Getting action download info
+2026-11-24T11:44:58.7345677Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-11-24T11:44:58.9742819Z Complete job name: android
+2026-11-24T11:44:59.0351820Z ##[group]Run actions/checkout@v4
+2026-11-24T11:44:59.0352543Z with:
+2026-11-24T11:44:59.0353129Z   repository: WaylandX11/Curie
+2026-11-24T11:44:59.0357800Z   token: ***
+2026-11-24T11:44:59.0358335Z   ssh-strict: true
+2026-11-24T11:44:59.0358858Z   ssh-user: git
+2026-11-24T11:44:59.0359401Z   persist-credentials: true
+2026-11-24T11:44:59.0360009Z   clean: true
+2026-11-24T11:44:59.0360565Z   sparse-checkout-cone-mode: true
+2026-11-24T11:44:59.0361199Z   fetch-depth: 1
+2026-11-24T11:44:59.0361718Z   fetch-tags: false
+2026-11-24T11:44:59.0362246Z   show-progress: true
+2026-11-24T11:44:59.0413652Z   lfs: false
+2026-11-24T11:44:59.0414360Z   submodules: false
+2026-11-24T11:44:59.0415177Z   set-safe-directory: true
+2026-11-24T11:44:59.0416181Z   allow-unsafe-pr-checkout: false
+2026-11-24T11:44:59.0417342Z ##[endgroup]
+2026-11-24T11:44:59.2704639Z Syncing repository: WaylandX11/Curie
+2026-11-24T11:44:59.2706589Z ##[group]Getting Git version info
+2026-11-24T11:44:59.2707616Z Working directory is '/home/runner/work/Curie/Curie'
+2026-11-24T11:44:59.2709058Z [command]/usr/bin/git version
+2026-11-24T11:44:59.2761776Z git version 2.56.1
+2026-11-24T11:44:59.2774528Z ##[endgroup]
+2026-11-24T11:44:59.2786835Z Temporarily overriding HOME='/home/runner/work/_temp/2b784479-fa6c-4f3e-85e3-ad9027814826' before making global git config changes
+2026-11-24T11:44:59.2789160Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-24T11:44:59.2790982Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Curie/Curie
+2026-11-24T11:44:59.2853245Z Deleting the contents of '/home/runner/work/Curie/Curie'
+2026-11-24T11:44:59.2855497Z ##[group]Initializing the repository
+2026-11-24T11:44:59.2856804Z [command]/usr/bin/git init /home/runner/work/Curie/Curie
+2026-11-24T11:44:59.2934503Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-24T11:44:59.2936874Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-24T11:44:59.2938407Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-24T11:44:59.2939854Z hint: call:
+2026-11-24T11:44:59.2940524Z hint:
+2026-11-24T11:44:59.2941369Z hint: 	git config --global init.defaultBranch <name>
+2026-11-24T11:44:59.2942384Z hint:
+2026-11-24T11:44:59.2943334Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-24T11:44:59.2944896Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-24T11:44:59.2946241Z hint:
+2026-11-24T11:44:59.2946899Z hint: 	git branch -m <name>
+2026-11-24T11:44:59.2947675Z hint:
+2026-11-24T11:44:59.2948727Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-24T11:44:59.2958004Z Initialized empty Git repository in /home/runner/work/Curie/Curie/.git/
+2026-11-24T11:44:59.2968599Z [command]/usr/bin/git remote add origin https://github.com/WaylandX11/Curie
+2026-11-24T11:44:59.3028101Z ##[endgroup]
+2026-11-24T11:44:59.3029481Z ##[group]Disabling automatic garbage collection
+2026-11-24T11:44:59.3030689Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-24T11:44:59.3053514Z ##[endgroup]
+2026-11-24T11:44:59.3054770Z ##[group]Setting up auth
+2026-11-24T11:44:59.3056414Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-24T11:44:59.3086939Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-24T11:44:59.3509358Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-24T11:44:59.3537152Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-24T11:44:59.3751809Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-24T11:44:59.3777258Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-24T11:44:59.3989029Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-24T11:44:59.4020719Z ##[endgroup]
+2026-11-24T11:44:59.4021597Z ##[group]Fetching the repository
+2026-11-24T11:44:59.4026922Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +64a83c5c6885b663dba0e6a95f478b14f4ce34a5:refs/tags/v26.11.24.1430-alpha
+2026-11-24T11:44:59.8326897Z From https://github.com/WaylandX11/Curie
+2026-11-24T11:44:59.8328805Z  * [new ref]         64a83c5c6885b663dba0e6a95f478b14f4ce34a5 -> v26.11.24.1430-alpha
+2026-11-24T11:44:59.8332611Z ##[endgroup]
+2026-11-24T11:44:59.8333940Z ##[group]Determining the checkout info
+2026-11-24T11:44:59.8335640Z ##[endgroup]
+2026-11-24T11:44:59.8338902Z [command]/usr/bin/git sparse-checkout disable
+2026-11-24T11:44:59.8385159Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-24T11:44:59.8409941Z ##[group]Checking out the ref
+2026-11-24T11:44:59.8412417Z [command]/usr/bin/git checkout --progress --force refs/tags/v26.11.24.1430-alpha
+2026-11-24T11:44:59.8553666Z Note: switching to 'refs/tags/v26.11.24.1430-alpha'.
+2026-11-24T11:44:59.8554510Z 
+2026-11-24T11:44:59.8555152Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-24T11:44:59.8556840Z changes and commit them, and you can discard any commits you make in this
+2026-11-24T11:44:59.8558373Z state without impacting any branches by switching back to a branch.
+2026-11-24T11:44:59.8559573Z 
+2026-11-24T11:44:59.8560158Z If you want to create a new branch to retain commits you create, you may
+2026-11-24T11:44:59.8561065Z do so (now or later) by using -c with the switch command. Example:
+2026-11-24T11:44:59.8561735Z 
+2026-11-24T11:44:59.8561976Z   git switch -c <new-branch-name>
+2026-11-24T11:44:59.8562353Z 
+2026-11-24T11:44:59.8562611Z Or undo this operation with:
+2026-11-24T11:44:59.8562995Z 
+2026-11-24T11:44:59.8563252Z   git switch -
+2026-11-24T11:44:59.8563589Z 
+2026-11-24T11:44:59.8564249Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-24T11:44:59.8564971Z 
+2026-11-24T11:44:59.8565765Z HEAD is now at 64a83c5 Curie 26.11.24.1430-alpha — чистый старт
+2026-11-24T11:44:59.8567657Z ##[endgroup]
+2026-11-24T11:44:59.8597760Z [command]/usr/bin/git log -1 --format=%H
+2026-11-24T11:44:59.8617423Z 64a83c5c6885b663dba0e6a95f478b14f4ce34a5
+2026-11-24T11:44:59.8886872Z ##[group]Run actions/setup-java@v4
+2026-11-24T11:44:59.8887482Z with:
+2026-11-24T11:44:59.8887957Z   distribution: temurin
+2026-11-24T11:44:59.8888474Z   java-version: 17
+2026-11-24T11:44:59.8888982Z   java-package: jdk
+2026-11-24T11:44:59.8889485Z   check-latest: false
+2026-11-24T11:44:59.8889995Z   server-id: github
+2026-11-24T11:44:59.8890516Z   server-username: GITHUB_ACTOR
+2026-11-24T11:44:59.8891111Z   server-password: GITHUB_TOKEN
+2026-11-24T11:44:59.8891703Z   overwrite-settings: true
+2026-11-24T11:44:59.8892245Z   job-status: success
+2026-11-24T11:44:59.8896659Z   token: ***
+2026-11-24T11:44:59.8897142Z ##[endgroup]
+2026-11-24T11:45:00.0059666Z ##[warning]setup-java v4 is deprecated and will no longer receive updates. Please migrate to actions/setup-java@v5.
+2026-11-24T11:45:00.0067143Z ##[group]Installed distributions
+2026-11-24T11:45:00.0082731Z Resolved Java 17.0.21+9 from tool-cache
+2026-11-24T11:45:00.0083788Z Setting Java 17.0.21+9 as the default
+2026-11-24T11:45:00.0090384Z (node:2186) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-24T11:45:00.0091834Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-24T11:45:00.0092824Z Creating toolchains.xml for JDK version 17 from temurin
+2026-11-24T11:45:00.0154667Z Writing to /home/runner/.m2/toolchains.xml
+2026-11-24T11:45:00.0155484Z 
+2026-11-24T11:45:00.0155754Z Java configuration:
+2026-11-24T11:45:00.0156357Z   Distribution: temurin
+2026-11-24T11:45:00.0156894Z   Version: 17.0.21+9
+2026-11-24T11:45:00.0157662Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0158335Z 
+2026-11-24T11:45:00.0159163Z ##[endgroup]
+2026-11-24T11:45:00.0176652Z Creating settings.xml with server-id: github
+2026-11-24T11:45:00.0177954Z Writing to /home/runner/.m2/settings.xml
+2026-11-24T11:45:00.0554198Z ##[group]Run subosito/flutter-action@v2
+2026-11-24T11:45:00.0554862Z with:
+2026-11-24T11:45:00.0555445Z   channel: stable
+2026-11-24T11:45:00.0555962Z   cache: true
+2026-11-24T11:45:00.0556452Z   architecture: X64
+2026-11-24T11:45:00.0556979Z   pub-cache-path: default
+2026-11-24T11:45:00.0557525Z   dry-run: false
+2026-11-24T11:45:00.0558121Z   git-source: https://github.com/flutter/flutter.git
+2026-11-24T11:45:00.0558812Z env:
+2026-11-24T11:45:00.0559472Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0560485Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0561313Z ##[endgroup]
+2026-11-24T11:45:00.0607505Z ##[start-action display=Make yq tool available on Windows runners;id=__subosito_flutter-action.__run]
+2026-11-24T11:45:00.0619768Z ##[end-action id=__subosito_flutter-action.__run;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-24T11:45:00.0623450Z ##[start-action display=Make setup script executable;id=__subosito_flutter-action.__run_2]
+2026-11-24T11:45:00.0678587Z ##[group]Run chmod +x "$GITHUB_ACTION_PATH/setup.sh"
+2026-11-24T11:45:00.0679623Z [36;1mchmod +x "$GITHUB_ACTION_PATH/setup.sh"[0m
+2026-11-24T11:45:00.0713761Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-24T11:45:00.0714487Z env:
+2026-11-24T11:45:00.0715160Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0716268Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0717086Z ##[endgroup]
+2026-11-24T11:45:00.0829414Z ##[end-action id=__subosito_flutter-action.__run_2;outcome=success;conclusion=success;duration_ms=20]
+2026-11-24T11:45:00.0833829Z ##[start-action display=Set action inputs;id=__subosito_flutter-action.flutter-action]
+2026-11-24T11:45:00.0874311Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh -p \
+2026-11-24T11:45:00.0875045Z [36;1m$GITHUB_ACTION_PATH/setup.sh -p \[0m
+2026-11-24T11:45:00.0875899Z [36;1m  -n '' \[0m
+2026-11-24T11:45:00.0876382Z [36;1m  -f '' \[0m
+2026-11-24T11:45:00.0876872Z [36;1m  -a 'X64' \[0m
+2026-11-24T11:45:00.0877364Z [36;1m  -k '' \[0m
+2026-11-24T11:45:00.0877858Z [36;1m  -c '' \[0m
+2026-11-24T11:45:00.0878335Z [36;1m  -l '' \[0m
+2026-11-24T11:45:00.0878835Z [36;1m  -d 'default' \[0m
+2026-11-24T11:45:00.0879503Z [36;1m  -g 'https://github.com/flutter/flutter.git' \[0m
+2026-11-24T11:45:00.0880192Z [36;1m  stable[0m
+2026-11-24T11:45:00.0908794Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-24T11:45:00.0909488Z env:
+2026-11-24T11:45:00.0910140Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0911138Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.0911935Z ##[endgroup]
+2026-11-24T11:45:00.3494554Z ##[end-action id=__subosito_flutter-action.flutter-action;outcome=success;conclusion=success;duration_ms=265]
+2026-11-24T11:45:00.3500903Z ##[start-action display=Cache Flutter;id=__subosito_flutter-action.cache-flutter]
+2026-11-24T11:45:00.3566823Z ##[group]Run actions/cache@v5
+2026-11-24T11:45:00.3567376Z with:
+2026-11-24T11:45:00.3567938Z   path: /opt/hostedtoolcache/flutter/stable-3.50.1-x64
+2026-11-24T11:45:00.3568877Z   key: flutter-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7
+2026-11-24T11:45:00.3569745Z   enableCrossOsArchive: false
+2026-11-24T11:45:00.3570313Z   fail-on-cache-miss: false
+2026-11-24T11:45:00.3570840Z   lookup-only: false
+2026-11-24T11:45:00.3571335Z   save-always: false
+2026-11-24T11:45:00.3571807Z env:
+2026-11-24T11:45:00.3572429Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.3573405Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:00.3574181Z ##[endgroup]
+2026-11-24T11:45:00.5689873Z Cache hit for: flutter-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7
+2026-11-24T11:45:01.7236017Z Received 142606336 of 1675610135 (8.5%), 135.9 MBs/sec
+2026-11-24T11:45:02.7206897Z Received 402653184 of 1675610135 (24.0%), 191.9 MBs/sec
+2026-11-24T11:45:03.7233583Z Received 650117120 of 1675610135 (38.8%), 206.5 MBs/sec
+2026-11-24T11:45:04.7238703Z Received 901775360 of 1675610135 (53.8%), 214.8 MBs/sec
+2026-11-24T11:45:05.7237061Z Received 1145044992 of 1675610135 (68.3%), 218.3 MBs/sec
+2026-11-24T11:45:06.7228238Z Received 1409286144 of 1675610135 (84.1%), 223.9 MBs/sec
+2026-11-24T11:45:07.7261872Z Received 1665138688 of 1675610135 (99.4%), 226.7 MBs/sec
+2026-11-24T11:45:07.7746915Z Received 1675610135 of 1675610135 (100.0%), 226.5 MBs/sec
+2026-11-24T11:45:07.7755910Z Cache Size: ~1598 MB (1675610135 B)
+2026-11-24T11:45:07.7840749Z [command]/usr/bin/tar -xf /home/runner/work/_temp/0050bf3f-768c-4f0c-bde0-92430f7ab345/cache.tzst -P -C /home/runner/work/Curie/Curie --use-compress-program unzstd
+2026-11-24T11:45:17.1004181Z Cache restored successfully
+2026-11-24T11:45:17.1786083Z Cache restored from key: flutter-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7
+2026-11-24T11:45:17.1930365Z ##[end-action id=__subosito_flutter-action.cache-flutter;outcome=success;conclusion=success;duration_ms=16842]
+2026-11-24T11:45:17.1933973Z ##[start-action display=Cache pub dependencies;id=__subosito_flutter-action.cache-pub]
+2026-11-24T11:45:17.2540358Z ##[group]Run actions/cache@v5
+2026-11-24T11:45:17.2540570Z with:
+2026-11-24T11:45:17.2540711Z   path: /home/runner/.pub-cache
+2026-11-24T11:45:17.2541115Z   key: flutter-pub-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7-1a6980173f7bc0aea0eb9a030ed8d8b49bd0b63eef929a28c41676c5076c767c
+2026-11-24T11:45:17.2541528Z   enableCrossOsArchive: false
+2026-11-24T11:45:17.2541792Z   fail-on-cache-miss: false
+2026-11-24T11:45:17.2541970Z   lookup-only: false
+2026-11-24T11:45:17.2542117Z   save-always: false
+2026-11-24T11:45:17.2542241Z env:
+2026-11-24T11:45:17.2542420Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:17.2542718Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:17.2542933Z ##[endgroup]
+2026-11-24T11:45:17.4720481Z Cache hit for: flutter-pub-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7-1a6980173f7bc0aea0eb9a030ed8d8b49bd0b63eef929a28c41676c5076c767c
+2026-11-24T11:45:18.3913503Z Received 52401701 of 52401701 (100.0%), 66.9 MBs/sec
+2026-11-24T11:45:18.3914025Z Cache Size: ~50 MB (52401701 B)
+2026-11-24T11:45:18.3953837Z [command]/usr/bin/tar -xf /home/runner/work/_temp/178b408a-dcae-4de2-87c6-d4e446aee550/cache.tzst -P -C /home/runner/work/Curie/Curie --use-compress-program unzstd
+2026-11-24T11:45:19.0853064Z Cache restored successfully
+2026-11-24T11:45:19.0928184Z Cache restored from key: flutter-pub-linux-stable-3.50.1-x64-ae9b586f34a8443573f82ef57c3bf914a908cbf7-1a6980173f7bc0aea0eb9a030ed8d8b49bd0b63eef929a28c41676c5076c767c
+2026-11-24T11:45:19.1055101Z ##[end-action id=__subosito_flutter-action.cache-pub;outcome=success;conclusion=success;duration_ms=1912]
+2026-11-24T11:45:19.1058090Z ##[start-action display=Run setup script;id=__subosito_flutter-action.__run_3]
+2026-11-24T11:45:19.1088849Z ##[group]Run $GITHUB_ACTION_PATH/setup.sh \
+2026-11-24T11:45:19.1089085Z [36;1m$GITHUB_ACTION_PATH/setup.sh \[0m
+2026-11-24T11:45:19.1089258Z [36;1m  -n '3.50.1' \[0m
+2026-11-24T11:45:19.1089411Z [36;1m  -a 'x64' \[0m
+2026-11-24T11:45:19.1089591Z [36;1m  -c '/opt/hostedtoolcache/flutter/stable-3.50.1-x64' \[0m
+2026-11-24T11:45:19.1089810Z [36;1m  -d '/home/runner/.pub-cache' \[0m
+2026-11-24T11:45:19.1089968Z [36;1m  stable[0m
+2026-11-24T11:45:19.1116791Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-24T11:45:19.1116988Z env:
+2026-11-24T11:45:19.1117169Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:19.1117450Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:19.1117667Z ##[endgroup]
+2026-11-24T11:45:19.3874133Z ##[end-action id=__subosito_flutter-action.__run_3;outcome=success;conclusion=success;duration_ms=281]
+2026-11-24T11:45:19.3915888Z ##[group]Run set -euo pipefail
+2026-11-24T11:45:19.3916097Z [36;1mset -euo pipefail[0m
+2026-11-24T11:45:19.3916421Z [36;1mversion=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['version'])")[0m
+2026-11-24T11:45:19.3916834Z [36;1mexpected=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['sha256'])")[0m
+2026-11-24T11:45:19.3917254Z [36;1murl="https://github.com/XTLS/libXray/releases/download/$version/libxray-android.zip"[0m
+2026-11-24T11:45:19.3917525Z [36;1mcurl -fsSL "$url" -o /tmp/core.zip[0m
+2026-11-24T11:45:19.3917737Z [36;1mecho "$expected  /tmp/core.zip" | sha256sum -c -[0m
+2026-11-24T11:45:19.3917937Z [36;1mmkdir -p app/android/app/libs[0m
+2026-11-24T11:45:19.3918133Z [36;1munzip -o -j /tmp/core.zip -d app/android/app/libs[0m
+2026-11-24T11:45:19.3946284Z shell: /usr/bin/bash -e {0}
+2026-11-24T11:45:19.3946438Z env:
+2026-11-24T11:45:19.3946660Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:19.3946939Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:19.3947347Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.50.1-x64/flutter
+2026-11-24T11:45:19.3947564Z   PUB_CACHE: /home/runner/.pub-cache
+2026-11-24T11:45:19.3947718Z ##[endgroup]
+2026-11-24T11:45:20.1277981Z /tmp/core.zip: OK
+2026-11-24T11:45:20.1324985Z Archive:  /tmp/core.zip
+2026-11-24T11:45:20.1327102Z   inflating: app/android/app/libs/libXray-sources.jar  
+2026-11-24T11:45:20.3555477Z   inflating: app/android/app/libs/libXray.aar  
+2026-11-24T11:45:20.3583385Z ##[group]Run flutter pub get
+2026-11-24T11:45:20.3583587Z [36;1mflutter pub get[0m
+2026-11-24T11:45:20.3583730Z [36;1mflutter analyze[0m
+2026-11-24T11:45:20.3583869Z [36;1mflutter test[0m
+2026-11-24T11:45:20.3611066Z shell: /usr/bin/bash -e {0}
+2026-11-24T11:45:20.3611218Z env:
+2026-11-24T11:45:20.3611400Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:20.3611685Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:20.3611972Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.50.1-x64/flutter
+2026-11-24T11:45:20.3612188Z   PUB_CACHE: /home/runner/.pub-cache
+2026-11-24T11:45:20.3612349Z ##[endgroup]
+2026-11-24T11:45:20.4907730Z Resolving dependencies...
+2026-11-24T11:45:20.5641123Z Downloading packages...
+2026-11-24T11:45:20.5676472Z   cli_util 0.4.2 (0.6.1 available)
+2026-11-24T11:45:20.5676962Z   cross_file 0.3.5+5 (0.4.0 available)
+2026-11-24T11:45:20.5677657Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-11-24T11:45:20.5677993Z   test_api 0.7.14 (0.7.15 available)
+2026-11-24T11:45:20.5678279Z   vector_math 2.4.3 (2.4.4 available)
+2026-11-24T11:45:20.5678559Z Got dependencies!
+2026-11-24T11:45:20.5678882Z 5 packages have newer versions incompatible with dependency constraints.
+2026-11-24T11:45:20.5679313Z Try `flutter pub outdated` for more information.
+2026-11-24T11:45:20.8851951Z Resolving dependencies...
+2026-11-24T11:45:20.9577146Z Downloading packages...
+2026-11-24T11:45:20.9611309Z   cli_util 0.4.2 (0.6.1 available)
+2026-11-24T11:45:20.9611751Z   cross_file 0.3.5+5 (0.4.0 available)
+2026-11-24T11:45:20.9612268Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-11-24T11:45:20.9612698Z   test_api 0.7.14 (0.7.15 available)
+2026-11-24T11:45:20.9613079Z   vector_math 2.4.3 (2.4.4 available)
+2026-11-24T11:45:20.9613417Z Got dependencies!
+2026-11-24T11:45:20.9614472Z 5 packages have newer versions incompatible with dependency constraints.
+2026-11-24T11:45:20.9615061Z Try `flutter pub outdated` for more information.
+2026-11-24T11:45:29.5523206Z Analyzing app...                                                
+2026-11-24T11:45:29.5533678Z No issues found! (ran in 8.3s)
+2026-11-24T11:45:29.7123512Z Resolving dependencies...
+2026-11-24T11:45:29.7850391Z Downloading packages...
+2026-11-24T11:45:29.7884565Z   cli_util 0.4.2 (0.6.1 available)
+2026-11-24T11:45:29.7884835Z   cross_file 0.3.5+5 (0.4.0 available)
+2026-11-24T11:45:29.7885133Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-11-24T11:45:29.7885550Z   test_api 0.7.14 (0.7.15 available)
+2026-11-24T11:45:29.7885793Z   vector_math 2.4.3 (2.4.4 available)
+2026-11-24T11:45:29.7886045Z Got dependencies!
+2026-11-24T11:45:29.7887261Z 5 packages have newer versions incompatible with dependency constraints.
+2026-11-24T11:45:29.7887515Z Try `flutter pub outdated` for more information.
+2026-11-24T11:45:30.9447892Z 
+2026-11-24T11:45:36.1539180Z ##[group]✅ Passing tests
+2026-11-24T11:45:36.1539648Z ✅ /home/runner/work/Curie/Curie/app/test/apps_test.dart: user apps come first, alphabetically inside the group
+2026-11-24T11:45:36.1554561Z ✅ /home/runner/work/Curie/Curie/app/test/apps_test.dart: an app without a launcher icon still parses
+2026-11-24T11:45:36.5080164Z ✅ /home/runner/work/Curie/Curie/app/test/traffic_test.dart: parses v26 /debug/vars shape and skips service outbounds
+2026-11-24T11:45:36.5092939Z ✅ /home/runner/work/Curie/Curie/app/test/traffic_test.dart: malformed metrics do not throw
+2026-11-24T11:45:37.0100541Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: routing mode has a stable wire name for the platform channel
+2026-11-24T11:45:37.0127436Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: default DNS is Yandex and wins over the panel
+2026-11-24T11:45:37.0155531Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: old settings migrate to the working DNS without losing a custom value
+2026-11-24T11:45:37.0177616Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: selected apps depend on the mode
+2026-11-24T11:45:37.0195549Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: settings survive a storage round trip
+2026-11-24T11:45:37.0206931Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: ping mode survives storage and old ICMP migrates to TCP
+2026-11-24T11:45:37.0226988Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: selected node falls back when the subscription loses it
+2026-11-24T11:45:37.0249889Z ✅ /home/runner/work/Curie/Curie/app/test/settings_test.dart: state survives a storage round trip
+2026-11-24T11:45:37.2941165Z ✅ /home/runner/work/Curie/Curie/app/test/update_test.dart: parses tag, notes and the four APK assets
+2026-11-24T11:45:37.2966432Z ✅ /home/runner/work/Curie/Curie/app/test/update_test.dart: missing split falls back to universal, then to release page
+2026-11-24T11:45:37.2996083Z ✅ /home/runner/work/Curie/Curie/app/test/update_test.dart: version comparison ignores the release suffix
+2026-11-24T11:45:41.1617176Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: extractLinks plain list, comments and duplicates are handled
+2026-11-24T11:45:41.1633626Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: extractLinks base64 subscription wrapper is decoded
+2026-11-24T11:45:41.1643649Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: extractLinks url-safe base64 without padding is decoded
+2026-11-24T11:45:41.1655506Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: extractLinks garbage yields nothing
+2026-11-24T11:45:41.1675866Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: JSON request URL adds the explicit /json suffix to a bare subscription URL
+2026-11-24T11:45:41.1687508Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: JSON request URL keeps URLs that already choose a format
+2026-11-24T11:45:41.1696866Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: JSON request URL handles a trailing slash and does not change the stored URL
+2026-11-24T11:45:41.1709381Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: subscription link for other clients shareUrl strips the /json suffix Curie adds for itself
+2026-11-24T11:45:41.1958674Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: the panel update interval is stored with the subscription
+2026-11-24T11:45:41.1983614Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: subscription edits a manual node edit survives a subscription refresh
+2026-11-24T11:45:41.2006350Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: SubscriptionInfo parses the panel header
+2026-11-24T11:45:41.2016463Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: SubscriptionInfo zero total means unlimited
+2026-11-24T11:45:41.2025476Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: SubscriptionInfo missing header is not an error
+2026-11-24T11:45:41.2037381Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: subscription is stale until updated
+2026-11-24T11:45:41.2054652Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_test.dart: subscription survives a storage round trip
+2026-11-24T11:45:42.3547582Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: balancer pings every server under its selector
+2026-11-24T11:45:42.3583151Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: balancer selector matches tags by prefix
+2026-11-24T11:45:42.3612584Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: a regular node pings only its primary outbound
+2026-11-24T11:45:42.3666332Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: a balancer without matching tags falls back to the first server
+2026-11-24T11:45:42.3685560Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: pingBatch items keep outboundTag outside xrayJson
+2026-11-24T11:45:42.3726598Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: Remnawave fallback is measured after the numbered primary servers
+2026-11-24T11:45:42.3746147Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: explicit balancer fallbackTag is kept as a fallback target
+2026-11-24T11:45:42.3788742Z ✅ /home/runner/work/Curie/Curie/app/test/ping_targets_test.dart: duplicate address and port are measured once
+2026-11-24T11:45:47.0492866Z ✅ /home/runner/work/Curie/Curie/app/test/app_test.dart: empty state and navigation are shown in English
+2026-11-24T11:45:47.1310002Z ✅ /home/runner/work/Curie/Curie/app/test/app_test.dart: interface switches to Russian
+2026-11-24T11:45:47.6469625Z ✅ /home/runner/work/Curie/Curie/app/test/app_test.dart: theme switches between all palettes
+2026-11-24T11:45:47.6917012Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: HWID derived id has the requested grouped format
+2026-11-24T11:45:47.6936276Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: HWID same device gets the same id, different phones get different ids
+2026-11-24T11:45:47.6966559Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: HWID an old 32-character id is migrated without changing its bytes
+2026-11-24T11:45:47.6982891Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: HWID foreign formats are rejected
+2026-11-24T11:45:47.7010360Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: HWID sending HWID is off by default and survives a round trip
+2026-11-24T11:45:47.7041627Z ✅ /home/runner/work/Curie/Curie/app/test/hwid_test.dart: subscription errors panel codes become readable text
+2026-11-24T11:45:49.3978540Z ✅ /home/runner/work/Curie/Curie/app/test/localizations_test.dart: Russian translation covers every English key
+2026-11-24T11:45:49.3998069Z ✅ /home/runner/work/Curie/Curie/app/test/localizations_test.dart: no extra keys in Russian
+2026-11-24T11:45:49.4089728Z ✅ /home/runner/work/Curie/Curie/app/test/localizations_test.dart: placeholders match between languages
+2026-11-24T11:45:50.8275363Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: TUN inbound is present and fd is left to the platform
+2026-11-24T11:45:50.8293776Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: server outbound comes first, direct and dns-out are appended
+2026-11-24T11:45:50.8313069Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: DNS from the tunnel is handled before the private-network rule
+2026-11-24T11:45:50.8324809Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: no geo files are required by the default rules
+2026-11-24T11:45:50.8338549Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: settings change DNS, MTU and the local-network rule
+2026-11-24T11:45:50.8367593Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: panel routing, balancers and observatory survive TUN rebuild
+2026-11-24T11:45:50.8381565Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: metrics are enabled for the speed indicator
+2026-11-24T11:45:50.8391769Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: default DNS is Yandex, with a public fallback
+2026-11-24T11:45:50.8403720Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: the reliable default DNS wins over the panel config
+2026-11-24T11:45:50.8417771Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: DNS from subscription is used only when explicitly enabled
+2026-11-24T11:45:50.8431640Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: custom DNS equal to the fallback is not duplicated
+2026-11-24T11:45:50.8447932Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: TUN sniffing makes panel domain rules actually match
+2026-11-24T11:45:50.8460916Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: DNS can be routed directly when UDP DNS through the proxy is unwanted
+2026-11-24T11:45:50.8472706Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: local check proxy is routed through the server outbounds
+2026-11-24T11:45:50.8491269Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: a config with a fallback host gets an auto balancer with fallbackTag
+2026-11-24T11:45:50.8506875Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: a panel balancer without fallbackTag gets one
+2026-11-24T11:45:50.8518375Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: explicit panel domainStrategy is never overridden
+2026-11-24T11:45:50.8546266Z ✅ /home/runner/work/Curie/Curie/app/test/xray_config_test.dart: panel direct rules are kept before the catch-all balancer
+2026-11-24T11:45:51.4521534Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: emoji flag in the node name wins
+2026-11-24T11:45:51.4540561Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: country names in Russian and English are recognised
+2026-11-24T11:45:51.4549996Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: Russia is not mistaken for US
+2026-11-24T11:45:51.4575488Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: two-letter code only as a separate word
+2026-11-24T11:45:51.4590251Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: flag rendering and name cleanup
+2026-11-24T11:45:51.4613902Z ✅ /home/runner/work/Curie/Curie/app/test/country_test.dart: unknown node has no country
+2026-11-24T11:45:51.9076808Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription array of configs with remarks (XTLS standard)
+2026-11-24T11:45:51.9106281Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription bare outbounds object: every proxy outbound is a node
+2026-11-24T11:45:51.9166119Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription full config with routing stays one node
+2026-11-24T11:45:51.9272187Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription full config with a balancer keeps routing and observatory
+2026-11-24T11:45:51.9313053Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription id is stable across updates of the same node
+2026-11-24T11:45:51.9343742Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: JSON subscription garbage and empty configs yield nothing
+2026-11-24T11:45:51.9366182Z ✅ /home/runner/work/Curie/Curie/app/test/subscription_json_test.dart: headers base64 title and announce are decoded
+2026-11-24T11:45:52.0891958Z ✅ /home/runner/work/Curie/Curie/app/test/profile_test.dart: VLESS profile takes name from tag and address from vnext
+2026-11-24T11:45:52.0905342Z ✅ /home/runner/work/Curie/Curie/app/test/profile_test.dart: Shadowsocks profile takes address from servers
+2026-11-24T11:45:52.0921168Z ✅ /home/runner/work/Curie/Curie/app/test/profile_test.dart: profile survives a storage round trip
+2026-11-24T11:45:52.6684567Z ✅ /home/runner/work/Curie/Curie/app/test/importer_test.dart: proxy schemes are recognised
+2026-11-24T11:45:52.6696208Z ✅ /home/runner/work/Curie/Curie/app/test/importer_test.dart: subscription must be http(s) with a host
+2026-11-24T11:45:52.6724300Z ✅ /home/runner/work/Curie/Curie/app/test/importer_test.dart: scan separates links from the subscription URL and drops duplicates
+2026-11-24T11:45:52.6736652Z ✅ /home/runner/work/Curie/Curie/app/test/importer_test.dart: links win over a subscription URL when both are present
+2026-11-24T11:45:52.6752267Z ✅ /home/runner/work/Curie/Curie/app/test/importer_test.dart: empty and unrelated text yields nothing
+2026-11-24T11:45:53.1294407Z ✅ /home/runner/work/Curie/Curie/app/test/theme_test.dart: old SharedPreferences values keep working
+2026-11-24T11:45:53.1308561Z ✅ /home/runner/work/Curie/Curie/app/test/theme_test.dart: every theme has a stable id, label and brightness
+2026-11-24T11:45:53.1378615Z ✅ /home/runner/work/Curie/Curie/app/test/theme_test.dart: the header button cycles through all palettes
+2026-11-24T11:45:53.1564784Z ##[endgroup]
+2026-11-24T11:45:53.1564908Z 
+2026-11-24T11:45:53.1569283Z 🎉 92 tests passed.
+2026-11-24T11:45:53.2483893Z ##[group]Run flutter build apk --release
+2026-11-24T11:45:53.2484120Z [36;1mflutter build apk --release[0m
+2026-11-24T11:45:53.2484312Z [36;1mflutter build apk --release --split-per-abi[0m
+2026-11-24T11:45:53.2511921Z shell: /usr/bin/bash -e {0}
+2026-11-24T11:45:53.2512075Z env:
+2026-11-24T11:45:53.2512258Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:53.2512540Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.21-9/x64
+2026-11-24T11:45:53.2512821Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.50.1-x64/flutter
+2026-11-24T11:45:53.2513057Z   PUB_CACHE: /home/runner/.pub-cache
+2026-11-24T11:45:53.2513221Z ##[endgroup]
+2026-11-24T11:45:53.4231888Z Resolving dependencies...
+2026-11-24T11:45:53.4983039Z Downloading packages...
+2026-11-24T11:45:53.5016569Z   cli_util 0.4.2 (0.6.1 available)
+2026-11-24T11:45:53.5016833Z   cross_file 0.3.5+5 (0.4.0 available)
+2026-11-24T11:45:53.5017183Z   material_color_utilities 0.13.0 (0.13.1 available)
+2026-11-24T11:45:53.5017376Z   test_api 0.7.14 (0.7.15 available)
+2026-11-24T11:45:53.5017547Z   vector_math 2.4.3 (2.4.4 available)
+2026-11-24T11:45:53.5017702Z Got dependencies!
+2026-11-24T11:45:53.5020066Z 5 packages have newer versions incompatible with dependency constraints.
+2026-11-24T11:45:53.5020470Z Try `flutter pub outdated` for more information.
+2026-11-24T11:46:49.0224894Z Running Gradle task 'assembleRelease'...                        
+2026-11-24T11:46:49.0225686Z Loading package information...                                                  
+2026-11-24T11:46:49.0226136Z Loading local repository...                                                     
+2026-11-24T11:46:49.0228974Z [                                       ] 3% Loading local repository...        
+2026-11-24T11:46:49.3217163Z [                                       ] 3% Fetch remote repository...         
+2026-11-24T11:46:49.6186268Z [=                                      ] 3% Fetch remote repository...         
+2026-11-24T11:46:49.7196774Z [=                                      ] 4% Fetch remote repository...         
+2026-11-24T11:46:49.7197563Z [=                                      ] 5% Fetch remote repository...         
+2026-11-24T11:46:49.7198151Z [==                                     ] 5% Fetch remote repository...         
+2026-11-24T11:46:49.7198850Z [==                                     ] 6% Fetch remote repository...         
+2026-11-24T11:46:49.8194596Z [==                                     ] 7% Fetch remote repository...         
+2026-11-24T11:46:49.8195446Z [==                                     ] 7% Computing updates...               
+2026-11-24T11:46:49.8195903Z [===                                    ] 8% Computing updates...               
+2026-11-24T11:46:49.8196468Z [===                                    ] 10% Computing updates...              
+2026-11-24T11:46:49.9185916Z [===                                    ] 10% Installing NDK (Side by side) 28.2
+2026-11-24T11:46:50.0191399Z [===                                    ] 10% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.1185804Z [====                                   ] 10% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.1186527Z [====                                   ] 11% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.2185179Z [====                                   ] 12% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.3185075Z [=====                                  ] 13% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.3185931Z [=====                                  ] 14% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.4183504Z [=====                                  ] 15% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.4184008Z [======                                 ] 15% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.5200927Z [======                                 ] 16% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.6187690Z [======                                 ] 17% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.6188116Z [=======                                ] 18% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.7188205Z [=======                                ] 19% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.7189771Z [=======                                ] 20% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.7190130Z [========                               ] 20% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.8185956Z [========                               ] 21% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.8186780Z [========                               ] 22% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.8187335Z [=========                              ] 23% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.9189127Z [=========                              ] 24% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.9190327Z [=========                              ] 25% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:50.9194879Z [==========                             ] 25% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.0188562Z [==========                             ] 26% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.0189755Z [==========                             ] 27% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.1184444Z [===========                            ] 28% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.1184888Z [===========                            ] 29% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.1185316Z [===========                            ] 30% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.2187874Z [============                           ] 30% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.2188610Z [============                           ] 31% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.3185828Z [============                           ] 32% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.3186280Z [============                           ] 33% Downloading android-ndk-r28c-linux
+2026-11-24T11:46:51.6206632Z [============                           ] 33% Unzipping...                      
+2026-11-24T11:46:51.6217617Z [============                           ] 33% Unzipping... android-ndk-r28c/    
+2026-11-24T11:46:51.6236119Z [============                           ] 33% Unzipping... android-ndk-r28c/READ
+2026-11-24T11:46:51.6236648Z [=============                          ] 33% Unzipping... android-ndk-r28c/READ
+2026-11-24T11:46:51.6237175Z [=============                          ] 33% Unzipping... android-ndk-r28c/meta
+2026-11-24T11:46:51.7192521Z [=============                          ] 33% Unzipping... android-ndk-r28c/shad
+2026-11-24T11:46:51.7193281Z [=============                          ] 33% Unzipping... android-ndk-r28c/ndk-
+2026-11-24T11:46:51.7193872Z [=============                          ] 33% Unzipping... android-ndk-r28c/wrap
+2026-11-24T11:46:51.7194402Z [=============                          ] 33% Unzipping... android-ndk-r28c/ndk-
+2026-11-24T11:46:52.0184640Z [=============                          ] 33% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:52.9184587Z [=============                          ] 34% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:53.8184872Z [=============                          ] 35% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:54.0183449Z [==============                         ] 35% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:54.3184679Z [==============                         ] 36% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:55.7184514Z [==============                         ] 37% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:57.3185122Z [===============                        ] 38% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:57.9184604Z [===============                        ] 39% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:58.2185034Z [===============                        ] 40% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:58.6184367Z [================                       ] 40% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:59.3184292Z [================                       ] 41% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:46:59.9184432Z [================                       ] 42% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:01.0184648Z [=================                      ] 43% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:02.6185345Z [=================                      ] 44% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:03.7214134Z [=================                      ] 45% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:04.3185753Z [==================                     ] 45% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:05.0184608Z [==================                     ] 46% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:05.7184030Z [==================                     ] 47% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:06.3184522Z [===================                    ] 48% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:07.0184072Z [===================                    ] 49% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:07.2185680Z [===================                    ] 50% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:07.5184946Z [====================                   ] 50% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:08.3185461Z [====================                   ] 51% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:08.6183031Z [====================                   ] 52% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:09.6184467Z [=====================                  ] 53% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:09.9182260Z [=====================                  ] 54% Unzipping... android-ndk-r28c/tool
+2026-11-24T11:47:10.0180309Z [=====================                  ] 54% Unzipping... android-ndk-r28c/buil
+2026-11-24T11:47:10.2185731Z [=====================                  ] 54% Unzipping... android-ndk-r28c/sour
+2026-11-24T11:47:10.2186495Z [=====================                  ] 54% Unzipping... android-ndk-r28c/NOTI
+2026-11-24T11:47:10.2197389Z [=====================                  ] 54% Unzipping... android-ndk-r28c/ndk-
+2026-11-24T11:47:10.2197793Z [=====================                  ] 54% Unzipping... android-ndk-r28c/NOTI
+2026-11-24T11:47:10.2198158Z [=====================                  ] 54% Unzipping... android-ndk-r28c/pyth
+2026-11-24T11:47:10.3184311Z [=====================                  ] 54% Unzipping... android-ndk-r28c/preb
+2026-11-24T11:47:10.3185641Z [=====================                  ] 54% Unzipping... android-ndk-r28c/ndk-
+2026-11-24T11:47:10.3185976Z [=====================                  ] 54% Unzipping... android-ndk-r28c/sour
+2026-11-24T11:47:10.3186293Z [=====================                  ] 54% Unzipping... android-ndk-r28c/simp
+2026-11-24T11:47:10.5184590Z [=====================                  ] 55% Unzipping... android-ndk-r28c/simp
+2026-11-24T11:47:10.6182657Z [=====================                  ] 55% Unzipping... android-ndk-r28c/CHAN
+2026-11-24T11:47:10.6183066Z [=======================================] 100% Unzipping... android-ndk-r28c/CHA
+2026-11-24T11:47:10.9185355Z 
+2026-11-24T11:48:40.4215852Z Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 9052 bytes (99.4% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+2026-11-24T11:48:52.5226805Z Caught exception: Already watching path: /opt/hostedtoolcache/flutter/stable-3.50.1-x64/flutter/packages/flutter_tools/gradle
+2026-11-24T11:49:45.2199574Z 
+2026-11-24T11:49:45.2204515Z FAILURE: Build failed with an exception.
+2026-11-24T11:49:45.2205083Z 
+2026-11-24T11:49:45.2205683Z * What went wrong:
+2026-11-24T11:49:45.2206273Z Execution failed for task ':image_picker_android:lintVitalAnalyzeRelease' (registered by plugin 'com.android.internal.library').
+2026-11-24T11:49:45.2207407Z > A failure occurred while executing com.android.build.gradle.internal.lint.AndroidLintWorkAction
+2026-11-24T11:49:45.2208824Z    > Unexpected failure during lint analysis (this is a bug in lint or one of the libraries it depends on)
+2026-11-24T11:49:45.2209309Z 
+2026-11-24T11:49:45.2209715Z      Message: Unexpected failure during lint analysis (this is a bug in lint or one of the libraries it depends on)
+2026-11-24T11:49:45.2210212Z 
+2026-11-24T11:49:45.2210676Z      Message: Unexpected failure during lint analysis of ExifDataCopier.java (this is a bug in lint or one of the libraries it depends on)
+2026-11-24T11:49:45.2211249Z 
+2026-11-24T11:49:45.2211530Z      Message: 'java.lang.Object java.util.List.removeLast()'
+2026-11-24T11:49:45.2211888Z 
+2026-11-24T11:49:45.2212255Z      The crash seems to involve the detector \\\`com.android.tools.lint.checks.CommentDetector\\\`.
+2026-11-24T11:49:45.2212836Z      You can try disabling it with something like this:
+2026-11-24T11:49:45.2217375Z          android {
+2026-11-24T11:49:45.2217608Z              lint {
+2026-11-24T11:49:45.2239834Z                  disable "EasterEgg", "StopShip"
+2026-11-24T11:49:45.2240223Z              }
+2026-11-24T11:49:45.2240417Z          }
+2026-11-24T11:49:45.2240521Z 
+2026-11-24T11:49:45.2319414Z      Stack: \\\`NoSuchMethodError:JavaDocParser.parseDataItem(JavaDocParser.kt:117)←JavaDocParser.parseDocCommentText(JavaDocParser.kt:66)←JavaDocElementType$DocCommentElementType.lambda$new$0(JavaDocElementType.java:167)←JavaParserUtil.lambda$parseFragment$9(JavaParserUtil.java:409)←ParsingUtil.parseFragment(ParsingUtil.kt:18)←JavaParserUtil.parseFragment(JavaParserUtil.java:408)←JavaParserUtil.parseFragmentWithHighestLanguageLevel(JavaParserUtil.java:379)←JavaDocElementType$DocCommentElementType.parseContents(JavaDocElementType.java:172)←LazyParseableElement.lambda$ensureParsed$2(LazyParseableElement.java:183)←DebugUtil.performPsiModification(DebugUtil.java:589)←LazyParseableElement.ensureParsed(LazyParseableElement.java:182)←LazyParseableElement.getFirstChildNode(LazyParseableElement.java:234)←LazyParseablePsiElement.getFirstChild(LazyParseablePsiElement.java:88)←PsiWalkingState$PsiTreeGuide.getFirstChild(PsiWalkingState.java:37)←PsiWalkingState$PsiTreeGuide.getFirstChild(PsiWalkingState.java:19)←WalkingState.next(WalkingState.java:70)←WalkingState.walkChildren(WalkingState.java:49)←WalkingState.elementStarted(WalkingState.java:40)←PsiWalkingState.elementStarted(PsiWalkingState.java:67)←PsiRecursiveElementWalkingVisitor.visitElement(PsiRecursiveElementWalkingVisitor.java:34)←PsiElementVisitor.visitFile(PsiElementVisitor.java:51)←PsiRecursiveElementWalkingVisitor.visitFile(PsiRecursiveElementWalkingVisitor.java:56)←PsiJavaFileBaseImpl.accept(PsiJavaFileBaseImpl.java:608)←JavaUFile.getAllCommentsInFile(JavaUFile.kt:49)←CommentDetector$CommentChecker.visitFile(CommentDetector.java:436)←UElementVisitor$DispatchUastVisitor.visitFile(UElementVisitor.kt:478)←UFile.accept(UFile.kt:86)←UastLintUtilsKt.acceptSourceFile(UastLintUtils.kt:956)←UElementVisitor$visitFile$3.run(UElementVisitor.kt:205)←LintClient.runReadAction(LintClient.kt:1655)←LintCliClient.runReadAction(LintCliClient.kt:231)←LintDriver$LintClientWrapper.runReadAction(LintDriver.kt:2694)←UElementVisitor.visitFile(UElementVisitor.kt:202)←LintDriver$visitUastDetectors$1.run(LintDriver.kt:2032)←LintClient.runReadAction(LintClient.kt:1655)←LintCliClient.runReadAction(LintCliClient.kt:231)←LintDriver$LintClientWrapper.runReadAction(LintDriver.kt:2694)←LintDriver.visitUastDetectors(LintDriver.kt:2030)←LintDriver.visitUast(LintDriver.kt:1977)←LintDriver.runFileDetectors(LintDriver.kt:1234)←LintDriver.checkProject(LintDriver.kt:1041)←LintDriver.checkProjectRoot(LintDriver.kt:607)←LintDriver.access$checkProjectRoot(LintDriver.kt:179)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:434)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:431)←LintDriver.doAnalyze(LintDriver.kt:490)←LintDriver.analyzeOnly(LintDriver.kt:431)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:265)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:262)←LintCliClient.run(LintCliClient.kt:311)←LintCliClient.analyzeOnly(LintCliClient.kt:262)←Main.run(Main.java:1786)←Main.run(Main.java:287)←NativeMethodAccessorImpl.invoke0(NativeMethodAccessorImpl.java:-2)←NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)←DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)←Method.invoke(Method.java:569)←AndroidLintWorkAction.invokeLintMainRunMethod(AndroidLintWorkAction.kt:103)←AndroidLintWorkAction.runLint(AndroidLintWorkAction.kt:90)←AndroidLintWorkAction.execute(AndroidLintWorkAction.kt:64)←DefaultWorkerServer.execute(DefaultWorkerServer.java:68)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)←ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:102)←NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)←AbstractWorker$1.call(AbstractWorker.java:44)←AbstractWorker$1.call(AbstractWorker.java:41)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)←AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)←NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)←DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)←FutureTask.run(FutureTask.java:264)←DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:191)←DefaultConditionalExecutionQueue$ExecutionRunner.access$500(DefaultConditionalExecutionQueue.java:112)←DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:168)←Factories$1.create(Factories.java:30)←DefaultWorkerLeaseService.lambda$withLocksAcquired$0(DefaultWorkerLeaseService.java:280)←ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)←DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:278)←DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:270)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:129)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:134)←DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:163)←DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:125)←Executors$RunnableAdapter.call(Executors.java:539)←FutureTask.run(FutureTask.java:264)←ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)←AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)←ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)←ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)←Thread.run(Thread.java:840)\\\`
+2026-11-24T11:49:45.2353746Z 
+2026-11-24T11:49:45.2354115Z      You can run with --stacktrace or set environment variable \\\`LINT_PRINT_STACKTRACE=true\\\` to dump a full stacktrace to stdout.
+2026-11-24T11:49:45.2370871Z      Stack: \`RuntimeException:LintDriver$Companion.handleDetectorError(LintDriver.kt:3603)←LintDriver$Companion.handleDetectorError$default(LintDriver.kt:3468)←LintDriver$Companion.handleDetectorError(LintDriver.kt:3464)←UElementVisitor.visitFile(UElementVisitor.kt:233)←LintDriver$visitUastDetectors$1.run(LintDriver.kt:2032)←LintClient.runReadAction(LintClient.kt:1655)←LintCliClient.runReadAction(LintCliClient.kt:231)←LintDriver$LintClientWrapper.runReadAction(LintDriver.kt:2694)←LintDriver.visitUastDetectors(LintDriver.kt:2030)←LintDriver.visitUast(LintDriver.kt:1977)←LintDriver.runFileDetectors(LintDriver.kt:1234)←LintDriver.checkProject(LintDriver.kt:1041)←LintDriver.checkProjectRoot(LintDriver.kt:607)←LintDriver.access$checkProjectRoot(LintDriver.kt:179)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:434)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:431)←LintDriver.doAnalyze(LintDriver.kt:490)←LintDriver.analyzeOnly(LintDriver.kt:431)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:265)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:262)←LintCliClient.run(LintCliClient.kt:311)←LintCliClient.analyzeOnly(LintCliClient.kt:262)←Main.run(Main.java:1786)←Main.run(Main.java:287)←NativeMethodAccessorImpl.invoke0(NativeMethodAccessorImpl.java:-2)←NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)←DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)←Method.invoke(Method.java:569)←AndroidLintWorkAction.invokeLintMainRunMethod(AndroidLintWorkAction.kt:103)←AndroidLintWorkAction.runLint(AndroidLintWorkAction.kt:90)←AndroidLintWorkAction.execute(AndroidLintWorkAction.kt:64)←DefaultWorkerServer.execute(DefaultWorkerServer.java:68)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)←ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:102)←NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)←AbstractWorker$1.call(AbstractWorker.java:44)←AbstractWorker$1.call(AbstractWorker.java:41)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)←AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)←NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)←DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)←FutureTask.run(FutureTask.java:264)←DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:191)←DefaultConditionalExecutionQueue$ExecutionRunner.access$500(DefaultConditionalExecutionQueue.java:112)←DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:168)←Factories$1.create(Factories.java:30)←DefaultWorkerLeaseService.lambda$withLocksAcquired$0(DefaultWorkerLeaseService.java:280)←ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)←DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:278)←DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:270)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:129)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:134)←DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:163)←DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:125)←Executors$RunnableAdapter.call(Executors.java:539)←FutureTask.run(FutureTask.java:264)←ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)←AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)←ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)←ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)←Thread.run(Thread.java:840)\`
+2026-11-24T11:49:45.2384494Z 
+2026-11-24T11:49:45.2387796Z      You can run with --stacktrace or set environment variable \`LINT_PRINT_STACKTRACE=true\` to dump a full stacktrace to stdout.
+2026-11-24T11:49:45.2404199Z      Stack: `RuntimeException:LintDriver$Companion.handleDetectorError(LintDriver.kt:3603)←LintDriver$Companion.handleDetectorError$default(LintDriver.kt:3468)←LintDriver$Companion.handleDetectorError(LintDriver.kt:3464)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:436)←LintDriver$analyzeOnly$1.invoke(LintDriver.kt:431)←LintDriver.doAnalyze(LintDriver.kt:490)←LintDriver.analyzeOnly(LintDriver.kt:431)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:265)←LintCliClient$analyzeOnly$1.invoke(LintCliClient.kt:262)←LintCliClient.run(LintCliClient.kt:311)←LintCliClient.analyzeOnly(LintCliClient.kt:262)←Main.run(Main.java:1786)←Main.run(Main.java:287)←NativeMethodAccessorImpl.invoke0(NativeMethodAccessorImpl.java:-2)←NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)←DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)←Method.invoke(Method.java:569)←AndroidLintWorkAction.invokeLintMainRunMethod(AndroidLintWorkAction.kt:103)←AndroidLintWorkAction.runLint(AndroidLintWorkAction.kt:90)←AndroidLintWorkAction.execute(AndroidLintWorkAction.kt:64)←DefaultWorkerServer.execute(DefaultWorkerServer.java:68)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)←NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)←ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:102)←NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)←AbstractWorker$1.call(AbstractWorker.java:44)←AbstractWorker$1.call(AbstractWorker.java:41)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)←DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)←DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)←DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)←DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)←AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)←NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)←DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:174)←FutureTask.run(FutureTask.java:264)←DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:191)←DefaultConditionalExecutionQueue$ExecutionRunner.access$500(DefaultConditionalExecutionQueue.java:112)←DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:168)←Factories$1.create(Factories.java:30)←DefaultWorkerLeaseService.lambda$withLocksAcquired$0(DefaultWorkerLeaseService.java:280)←ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)←DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:278)←DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:270)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:129)←DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:134)←DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:163)←DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:125)←Executors$RunnableAdapter.call(Executors.java:539)←FutureTask.run(FutureTask.java:264)←ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)←AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)←ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)←ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)←Thread.run(Thread.java:840)`
+2026-11-24T11:49:45.2416350Z 
+2026-11-24T11:49:45.2416669Z      You can run with --stacktrace or set environment variable `LINT_PRINT_STACKTRACE=true` to dump a full stacktrace to stdout.
+2026-11-24T11:49:45.2417211Z 
+2026-11-24T11:49:45.2417280Z * Try:
+2026-11-24T11:49:45.2417499Z > Run with --stacktrace option to get the stack trace.
+2026-11-24T11:49:45.2417816Z > Run with --info or --debug option to get more log output.
+2026-11-24T11:49:45.2418194Z > Run with --scan to get full insights from a Build Scan (powered by Develocity).
+2026-11-24T11:49:45.2418586Z > Get more help at https://help.gradle.org.
+2026-11-24T11:49:45.2418884Z 
+2026-11-24T11:49:45.2418971Z BUILD FAILED in 3m 51s
+2026-11-24T11:49:45.6838536Z Running Gradle task 'assembleRelease'...                          231.9s
+2026-11-24T11:49:45.7233885Z Gradle task assembleRelease failed with exit code 1
+2026-11-24T11:49:45.7337836Z ##[error]Process completed with exit code 1.
+2026-11-24T11:49:45.7463311Z Post job cleanup.
+2026-11-24T11:49:45.7466542Z ##[start-action display=Cache pub dependencies;id=__eb79c8d4-c2aa-4ba1-ba5d-378870e06f1d.cache-pub]
+2026-11-24T11:49:45.7467862Z ##[end-action id=__eb79c8d4-c2aa-4ba1-ba5d-378870e06f1d.cache-pub;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-24T11:49:45.7468898Z ##[start-action display=Cache Flutter;id=__eb79c8d4-c2aa-4ba1-ba5d-378870e06f1d.cache-flutter]
+2026-11-24T11:49:45.7490733Z ##[end-action id=__eb79c8d4-c2aa-4ba1-ba5d-378870e06f1d.cache-flutter;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-24T11:49:45.7531912Z Post job cleanup.
+2026-11-24T11:49:45.8433772Z (node:3654) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-24T11:49:45.8434426Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-24T11:49:45.8581524Z Post job cleanup.
+2026-11-24T11:49:45.9184902Z [command]/usr/bin/git version
+2026-11-24T11:49:45.9217915Z git version 2.56.1
+2026-11-24T11:49:45.9241540Z Temporarily overriding HOME='/home/runner/work/_temp/3e56b032-68cd-4490-9b16-d88f505bd616' before making global git config changes
+2026-11-24T11:49:45.9242473Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-24T11:49:45.9244827Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Curie/Curie
+2026-11-24T11:49:45.9277461Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-24T11:49:45.9304003Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-24T11:49:45.9585602Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-24T11:49:45.9615981Z http.https://github.com/.extraheader
+2026-11-24T11:49:45.9660989Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-24T11:49:45.9706127Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-24T11:49:45.9961067Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-24T11:49:45.9992836Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-24T11:49:46.0361865Z Cleaning up orphan processes
+2026-11-24T11:49:46.0690072Z Terminate orphan process: pid (2853) (java)
+2026-11-24T11:49:46.0740134Z Terminate orphan process: pid (3171) (java)
+2026-11-24T11:49:46.0824710Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

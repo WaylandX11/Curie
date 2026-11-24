@@ -36,6 +36,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    lint {
+        // AGP lintVitalAnalyzeRelease падает на image_picker_android из-за бага
+        // CommentDetector; Dart-анализ и тесты уже проверены в CI отдельно.
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 kotlin {
