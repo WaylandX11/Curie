@@ -128,7 +128,7 @@ class AppLocalizations {
     'languageRussian': 'Русский',
     'about': 'About',
     'appVersion': 'App version',
-    'coreVersion': 'Core',
+    'coreVersion': 'Xray / libXray',
     'licenses': 'Licenses',
     'licenseLegalese':
         'Curie code: Curie Source-Available License 1.0. Third-party '
@@ -301,7 +301,7 @@ class AppLocalizations {
     'languageRussian': 'Русский',
     'about': 'О приложении',
     'appVersion': 'Версия приложения',
-    'coreVersion': 'Ядро',
+    'coreVersion': 'Ядро Xray / libXray',
     'licenses': 'Лицензии',
     'licenseLegalese':
         'Код Curie — Curie Source-Available License 1.0. Сторонние '

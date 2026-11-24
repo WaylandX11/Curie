@@ -14,7 +14,6 @@ import '../services/store.dart';
 import '../services/theme_controller.dart';
 import '../services/update.dart';
 import '../services/vpn.dart';
-import '../services/xray.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'app_picker_screen.dart';
@@ -478,7 +477,6 @@ class _AboutTiles extends StatefulWidget {
 
 class _AboutTilesState extends State<_AboutTiles> {
   String _appVersion = '';
-  String _coreVersion = '';
   bool _checkingUpdate = false;
 
   @override
@@ -489,13 +487,11 @@ class _AboutTilesState extends State<_AboutTiles> {
 
   Future<void> _load() async {
     final info = await PackageInfo.fromPlatform();
-    final core = Vpn.isSupported ? await const Xray().version() : '';
     if (!mounted) return;
     setState(() {
       _appVersion = buildStamp.isEmpty
           ? '${info.version}+${info.buildNumber}'
           : buildStamp;
-      _coreVersion = core;
     });
   }
 
@@ -588,11 +584,6 @@ class _AboutTilesState extends State<_AboutTiles> {
     return Column(
       children: [
         ListTile(
-          leading: const Icon(Icons.info_outline),
-          title: Text(l10n.tr('appVersion')),
-          subtitle: Text(_appVersion.isEmpty ? '—' : _appVersion),
-        ),
-        ListTile(
           leading: const Icon(Icons.system_update_alt_outlined),
           title: Text(l10n.tr('checkUpdates')),
           subtitle: Text(
@@ -612,11 +603,6 @@ class _AboutTilesState extends State<_AboutTiles> {
         ListTile(
           leading: const Icon(Icons.memory),
           title: Text(l10n.tr('coreVersion')),
-          subtitle: Text(_coreVersion.isEmpty ? '—' : _coreVersion),
-        ),
-        const ListTile(
-          leading: Icon(Icons.extension_outlined),
-          title: Text('libXray'),
           subtitle: Text(libXrayVersion),
         ),
         ListTile(
