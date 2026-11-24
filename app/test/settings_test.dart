@@ -13,26 +13,32 @@ void main() {
     expect(RoutingMode.fromName(null), RoutingMode.all);
   });
 
-  test('default DNS is Yandex and wins over the panel', () {
+  test('DNS comes from the subscription by default', () {
     const settings = Settings();
-    expect(settings.dns, '77.88.8.8');
-    expect(settings.dnsUsePanel, isFalse);
+    expect(settings.dnsUsePanel, isTrue);
+    expect(settings.dns, '77.88.8.8', reason: 'адрес на случай пустой подписки');
   });
 
-  test('old settings migrate to the working DNS without losing a custom value', () {
-    final oldDefault = Settings.fromJson({'dns': '1.1.1.1'});
-    expect(oldDefault.dns, '77.88.8.8');
-    expect(oldDefault.dnsUsePanel, isFalse);
+  test('old DNS default migrates once, a custom address is kept', () {
+    final oldDefault = Settings.fromJson({
+      'dns': '77.88.8.8',
+      'dnsUsePanel': false,
+    });
+    expect(oldDefault.dnsUsePanel, isTrue);
 
-    final custom = Settings.fromJson({'dns': '77.88.8.8'});
-    expect(custom.dns, '77.88.8.8');
+    final legacy = Settings.fromJson({'dns': '1.1.1.1', 'dnsUsePanel': false});
+    expect(legacy.dns, '77.88.8.8');
+    expect(legacy.dnsUsePanel, isTrue);
+
+    final custom = Settings.fromJson({'dns': '9.9.9.9', 'dnsUsePanel': false});
+    expect(custom.dns, '9.9.9.9');
     expect(custom.dnsUsePanel, isFalse);
 
-    final fresh = Settings.fromJson(Settings().toJson());
-    expect(fresh.dnsUsePanel, isFalse);
-
-    final panel = Settings.fromJson(Settings(dnsUsePanel: true).toJson());
-    expect(panel.dnsUsePanel, isTrue);
+    // После миграции ручной выбор фиксированного адреса не перетирается.
+    final manual = Settings.fromJson(
+      Settings(dns: '9.9.9.9', dnsUsePanel: false).toJson(),
+    );
+    expect(manual.dnsUsePanel, isFalse);
   });
 
   test('selected apps depend on the mode', () {

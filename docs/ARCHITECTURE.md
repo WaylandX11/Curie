@@ -82,9 +82,10 @@
 - Полный конфиг панели сохраняется целиком: `routing.rules`, `routing.balancers`,
   `burstObservatory` и `dns`. Это обязательно для балансеров (`leastLoad`/`leastPing`) и обхода
   российских сайтов. При сборке заменяются только `inbounds` (вместо socks/http — TUN),
-  добавляются правило DNS и метрики; `xray.tun.fd` подставляет Kotlin. Исключение — DNS:
-  пользовательский адрес (по умолчанию `77.88.8.8`) перекрывает `dns.servers` панели, вернуть
-  конфиг панели можно пунктом «Из подписки». У TUN-inbound обязательно задано
+  добавляются правило DNS и метрики; `xray.tun.fd` подставляет Kotlin. По умолчанию DNS
+  берётся из `dns.servers` подписки; фиксированный адрес (резервный `77.88.8.8`) используется,
+  только если пользователь выбрал его в настройках или подписка не прислала DNS.
+  У TUN-inbound обязательно задано
   `settings.name`: без него Xray вызывает `net.Interfaces()` для генерации utun-имени и
   падает на Android ошибкой `netlinkrib: permission denied`.
 - Метаданные из заголовков: `profile-title`, `profile-update-interval`, `subscription-userinfo`,

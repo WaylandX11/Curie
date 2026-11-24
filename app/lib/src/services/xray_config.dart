@@ -183,9 +183,9 @@ Map<String, dynamic> _dns(Object? panelDns, Settings settings, String? tag) {
   Map<String, dynamic>? rest;
   List<dynamic> servers;
 
-  // По умолчанию берём надёжный 77.88.8.8, а не DNS из панели: именно он не
-  // вылетает из белых списков и работает у провайдеров, которые режут 1.1.1.1.
-  // DNS панели используется только если пользователь явно выбрал «Из подписки».
+  // По умолчанию берём DNS из подписки: он учитывает белые списки панели.
+  // Резервный 77.88.8.8 используется, только если подписка не прислала DNS
+  // или пользователь явно выбрал фиксированный адрес в настройках.
   final usePanelDns = settings.dnsUsePanel &&
       panelDns is Map &&
       (panelDns['servers'] as List?)?.isNotEmpty == true;

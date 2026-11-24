@@ -1,17 +1,13 @@
 import '../models/subscription.dart';
-import '../generated/build_info.dart';
 import 'app_log.dart';
 import 'device_identity.dart';
 import 'store.dart';
 import 'subscription_service.dart';
+import 'user_agent.dart';
 
 /// Операции над подписками: сеть + сохранение состояния.
 class Subscriptions {
   static const SubscriptionService _service = SubscriptionService();
-
-  /// Панели выбирают формат ответа по User-Agent, поэтому имя и версия
-  /// должны быть узнаваемыми: `Curie/26.11.23.1810`.
-  static String get userAgent => 'Curie/${buildStamp.isEmpty ? '0.1' : buildStamp}';
 
   /// Добавляет подписку и сразу её загружает. При ошибке подписка не сохраняется.
   static Future<SubscriptionException?> add(String url, String title) async {
@@ -30,7 +26,7 @@ class Subscriptions {
       final loaded = await _service.refresh(
         draft,
         headers: await DeviceIdentity.headers(),
-        userAgent: userAgent,
+        userAgent: await currentUserAgent(),
       );
       await Store.instance.update((state) => state.copyWith(
             subscriptions: [...state.subscriptions, loaded],
@@ -48,7 +44,7 @@ class Subscriptions {
       final loaded = await _service.refresh(
         subscription,
         headers: await DeviceIdentity.headers(),
-        userAgent: userAgent,
+        userAgent: await currentUserAgent(),
       );
       await _replace(loaded);
       AppLog.add('subscription', 'обновлена: ${loaded.title} (узлов: ${loaded.nodes.length})');

@@ -43,11 +43,13 @@ void main() {
       expect(DeviceIdentity.normalize('подпись-устройства'), isNull);
     });
 
-    test('sending HWID is off by default and survives a round trip', () {
-      expect(const Settings().sendHwid, isFalse);
-      const enabled = Settings(sendHwid: true);
-      expect(Settings.fromJson(enabled.toJson()).sendHwid, isTrue);
-      expect(Settings.fromJson(const Settings().toJson()).sendHwid, isFalse);
+    test('sending HWID is on by default and once migrated', () {
+      expect(const Settings().sendHwid, isTrue);
+      expect(Settings.fromJson(const Settings().toJson()).sendHwid, isTrue);
+      // Старые настройки переключаются один раз.
+      expect(Settings.fromJson({'sendHwid': false}).sendHwid, isTrue);
+      // Последующий ручной выключатель остаётся в силе.
+      expect(Settings.fromJson(Settings(sendHwid: false).toJson()).sendHwid, isFalse);
     });
   });
 

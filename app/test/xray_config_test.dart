@@ -109,9 +109,9 @@ void main() {
     expect(rules.first['outboundTag'], 'dns-out');
     expect(rules.last['balancerTag'], 'Germany_Balancer');
     expect(json['burstObservatory'], isNotNull);
-    // Маршрутизацию панели сохраняем, но DNS намеренно перекрываем рабочим адресом.
+    // Маршрутизацию панели сохраняем; DNS теперь тоже берём из подписки.
     expect(((json['dns'] as Map)['servers'] as List).first,
-        {'address': '77.88.8.8', 'tag': 'proxy'});
+        {'address': '1.1.1.1', 'tag': 'proxy'});
     expect((json['inbounds'] as List).length, 1, reason: 'socks панели не нужен');
   });
 
@@ -128,34 +128,34 @@ void main() {
     expect(system['statsOutboundDownlink'], isTrue);
   });
 
-  test('default DNS is Yandex, with a public fallback', () {
+  test('without a subscription DNS the fallback address is used', () {
     final servers = (build()['dns'] as Map)['servers'] as List;
     expect((servers.first as Map)['address'], '77.88.8.8');
     expect((servers.first as Map)['tag'], 'proxy');
     expect((servers.last as Map)['address'], '8.8.8.8');
   });
 
-  test('the reliable default DNS wins over the panel config', () {
+  test('the subscription DNS is used by default', () {
     final json = jsonDecode(buildXrayConfig(
       outbounds: [serverOutbound],
-      base: {
-        'dns': {'servers': ['1.1.1.1']},
-      },
-    )) as Map<String, dynamic>;
-    final servers = (json['dns'] as Map)['servers'] as List;
-    expect((servers.first as Map)['address'], '77.88.8.8');
-  });
-
-  test('DNS from subscription is used only when explicitly enabled', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      settings: const Settings(dnsUsePanel: true),
       base: {
         'dns': {'servers': ['1.1.1.1']},
       },
     )) as Map<String, dynamic>;
     final servers = (json['dns'] as Map)['servers'] as List;
     expect((servers.first as Map)['address'], '1.1.1.1');
+  });
+
+  test('an explicitly chosen DNS overrides the subscription', () {
+    final json = jsonDecode(buildXrayConfig(
+      outbounds: [serverOutbound],
+      settings: const Settings(dns: '9.9.9.9', dnsUsePanel: false),
+      base: {
+        'dns': {'servers': ['1.1.1.1']},
+      },
+    )) as Map<String, dynamic>;
+    final servers = (json['dns'] as Map)['servers'] as List;
+    expect((servers.first as Map)['address'], '9.9.9.9');
     expect((servers.first as Map)['tag'], 'proxy');
   });
 

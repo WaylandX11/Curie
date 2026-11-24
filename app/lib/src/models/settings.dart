@@ -82,12 +82,16 @@ enum DnsRoute {
 }
 
 class Settings {
-  /// Yandex DNS: доступен и через прокси, и напрямую, часто лежит в белых
-  /// списках панелей. 1.1.1.1/8.8.8.8 у многих провайдеров режутся.
+  /// Резервный DNS на случай, когда подписка не прислала свои серверы.
+  /// Само значение по умолчанию теперь — DNS из подписки (`dnsUsePanel`).
   static const defaultDns = '77.88.8.8';
 
   /// Значение по умолчанию в старых версиях — нужно только для миграции.
   static const legacyDefaultDns = '1.1.1.1';
+
+  /// Ревизия значений по умолчанию: когда она увеличивается, новые значения
+  /// применяются один раз и к уже сохранённым настройкам.
+  static const int currentDefaultsRevision = 2;
 
   /// Тестовая страница для замера через узел.
   static const defaultPingUrl = 'https://www.gstatic.com/generate_204';
@@ -99,16 +103,17 @@ class Settings {
     this.allowedApps = const [],
     this.bypassedApps = const [],
     this.dns = defaultDns,
-    this.dnsUsePanel = false,
+    this.dnsUsePanel = true,
     this.dnsRoute = DnsRoute.tunnel,
     this.bypassLan = true,
     this.autoUpdateSubscriptions = true,
-    this.sendHwid = false,
+    this.sendHwid = true,
     this.pingMode = PingMode.proxy,
     this.pingProfile = PingProfile.single,
     this.pingTimeoutSeconds = minPingTimeout,
     this.pingUrl = defaultPingUrl,
     this.mtu = 1500,
+    this.defaultsRevision = currentDefaultsRevision,
   });
 
   final RoutingMode routingMode;
@@ -116,17 +121,15 @@ class Settings {
   final List<String> bypassedApps;
   final String dns;
 
-  /// true — брать серверы из JSON подписки. По умолчанию false: надёжный
-  /// `77.88.8.8` важнее того, что прописала панель (у многих он единственный,
-  /// кто не режется провайдером и не вылетает из белых списков).
+  /// true — брать серверы из JSON подписки. Это значение по умолчанию:
+  /// адрес из панели учитывает её белые списки и настройки провайдера.
   final bool dnsUsePanel;
   final DnsRoute dnsRoute;
   final bool bypassLan;
   final bool autoUpdateSubscriptions;
 
-  /// Отправлять панели идентификатор устройства. Выключено по умолчанию:
-  /// это лишние данные о пользователе, включать стоит только если панель
-  /// требует HWID (лимит устройств).
+  /// Отправлять панели идентификатор устройства. Включено по умолчанию:
+  /// многие панели требуют HWID для лимита устройств. Отключается в настройках.
   final bool sendHwid;
 
   /// Чем мерить задержку узлов.
@@ -142,6 +145,9 @@ class Settings {
   final String pingUrl;
 
   final int mtu;
+
+  /// Служебное поле для одноразовой миграции значений по умолчанию.
+  final int defaultsRevision;
 
   List<String> get selectedApps =>
       routingMode == RoutingMode.onlySelected ? allowedApps : bypassedApps;
@@ -194,6 +200,7 @@ class Settings {
         'pingTimeoutSeconds': pingTimeoutSeconds,
         'pingUrl': pingUrl,
         'mtu': mtu,
+        'defaultsRevision': defaultsRevision,
       };
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -201,23 +208,32 @@ class Settings {
     final legacyDefault = savedDns == legacyDefaultDns;
     final savedTimeout = (json['pingTimeoutSeconds'] as num?)?.toInt();
     final savedUrl = json['pingUrl'] as String?;
+    final savedRevision = (json['defaultsRevision'] as num?)?.toInt() ?? 0;
+    final upgradeDefaults = savedRevision < currentDefaultsRevision;
+    // Старый адрес по умолчанию не считается осознанным выбором пользователя.
+    final oldDefaultDns = savedDns == null ||
+        savedDns.isEmpty ||
+        legacyDefault ||
+        savedDns == defaultDns;
     return Settings(
       routingMode: RoutingMode.fromName(json['routingMode'] as String?),
       allowedApps: ((json['allowedApps'] as List?) ?? const []).cast<String>(),
       bypassedApps: ((json['bypassedApps'] as List?) ?? const []).cast<String>(),
-      // Старое значение по умолчанию мигрирует на рабочий Yandex DNS.
+      // Старое значение по умолчанию мигрирует на резервный адрес.
       dns: (savedDns == null || savedDns.isEmpty || legacyDefault)
           ? defaultDns
           : savedDns,
-      // Раньше DNS панели всегда перекрывал пользовательский, когда был в JSON.
-      // Теперь по умолчанию используем надёжный адрес приложения — это и есть
-      // исправление проблемы, из-за которой сайты не грузились без ручной
-      // настройки 77.88.8.8.
-      dnsUsePanel: json['dnsUsePanel'] as bool? ?? false,
+      // Раньше по умолчанию был фиксированный 77.88.8.8. Теперь DNS берётся
+      // из подписки; пользователи со старым адресом переключаются один раз.
+      dnsUsePanel: (upgradeDefaults && oldDefaultDns)
+          ? true
+          : (json['dnsUsePanel'] as bool? ?? true),
       dnsRoute: DnsRoute.fromName(json['dnsRoute'] as String?),
       bypassLan: (json['bypassLan'] as bool?) ?? true,
       autoUpdateSubscriptions: (json['autoUpdateSubscriptions'] as bool?) ?? true,
-      sendHwid: (json['sendHwid'] as bool?) ?? false,
+      // HWID включаем и для уже установленных приложений, но только один раз:
+      // последующий ручной выключатель остаётся в силе.
+      sendHwid: upgradeDefaults ? true : (json['sendHwid'] as bool? ?? true),
       pingMode: PingMode.fromName(json['pingMode'] as String?),
       pingProfile: PingProfile.fromName(json['pingProfile'] as String?),
       pingTimeoutSeconds: savedTimeout == null
@@ -229,6 +245,7 @@ class Settings {
           ? defaultPingUrl
           : savedUrl.trim(),
       mtu: (json['mtu'] as num?)?.toInt() ?? 1500,
+      defaultsRevision: currentDefaultsRevision,
     );
   }
 }
