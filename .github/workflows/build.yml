@@ -1,0 +1,73 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect project
+        id: detect
+        run: |
+          if [ -f app/pubspec.yaml ]; then
+            echo "ok=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=no" >> "$GITHUB_OUTPUT"
+            echo "app/ ещё не создан (scripts/setup.ps1). Сборку пропускаю."
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.detect.outputs.ok == 'yes'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        if: steps.detect.outputs.ok == 'yes'
+        with:
+          channel: stable
+          cache: true
+
+      - name: Fetch core (libXray.aar)
+        if: steps.detect.outputs.ok == 'yes'
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['version'])" 2>/dev/null || echo "")
+          if [ -z "$version" ]; then echo "core.lock.json отсутствует — запустите scripts/sync-core.ps1"; exit 1; fi
+          expected=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['sha256'])")
+          url="https://github.com/XTLS/libXray/releases/download/$version/libxray-android.zip"
+          curl -fsSL "$url" -o /tmp/core.zip
+          echo "$expected  /tmp/core.zip" | sha256sum -c -
+          mkdir -p app/android/app/libs
+          # В архиве только libXray.aar и sources.jar; -j кладёт их в одну папку
+          # независимо от имени верхнего каталога в архиве.
+          unzip -o -j /tmp/core.zip -d app/android/app/libs
+          ls -l app/android/app/libs
+
+      # NDK не нужен: в проекте нет своего нативного кода, libXray.aar уже
+      # содержит готовые .so. Раньше этот шаг падал на sdkmanager в Actions.
+
+      - name: Analyze and test
+        if: steps.detect.outputs.ok == 'yes'
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build debug APK
+        if: steps.detect.outputs.ok == 'yes'
+        working-directory: app
+        run: flutter build apk --debug
+
+      - uses: actions/upload-artifact@v4
+        if: steps.detect.outputs.ok == 'yes'
+        with:
+          name: curie-debug-apk
+          path: app/build/app/outputs/flutter-apk/*.apk

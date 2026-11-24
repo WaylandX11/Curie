@@ -1,0 +1,50 @@
+Curie Source-Available License, Version 1.0
+
+Copyright (c) 2026 WaylandX11
+
+Definitions
+------------------
+"Software" means the Curie application source code, build scripts and
+documentation published in this repository, excluding third-party components
+listed in THIRD_PARTY_NOTICES.md.
+"You" means an individual or entity exercising the permissions below.
+
+Permission
+----------
+You are granted a non-exclusive, non-transferable, revocable permission to:
+
+1. view, read and copy the Software for personal study;
+2. compile, build and run the Software on devices You own or control, for
+   Your own personal, non-commercial purposes;
+3. make private modifications to the Software for those same personal,
+   non-commercial purposes.
+
+Restrictions
+------------
+Without prior written permission from the copyright holder You may not:
+
+1. publish, redistribute or otherwise make the Software, or any modified
+   version of it, available to third parties, in source or binary form;
+2. distribute, sell, sublicense or otherwise transfer any copy of the Software;
+3. use the Software or any derivative of it in a commercial product, service
+   or business operation;
+4. remove or alter this notice or any attribution notices in the Software.
+
+The permission ends automatically if You breach any of these restrictions.
+All rights not expressly granted are reserved.
+
+Third-party components
+----------------------
+The Software depends on components licensed separately (libXray — MIT,
+Xray-core — MPL-2.0, Flutter — BSD-3, and the packages listed in
+THIRD_PARTY_NOTICES.md). Their licenses and notices are not changed by this
+license and remain in force for those components.
+
+Disclaimer
+----------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

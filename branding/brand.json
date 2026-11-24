@@ -1,0 +1,15 @@
+{
+  "name": "Curie",
+  "projectName": "curie",
+  "org": "io.github.waylandx11",
+  "applicationId": "io.github.waylandx11.curie",
+  "iosBundleId": "io.github.waylandx11.curie",
+  "primaryColor": "#2FE3D0",
+  "darkBackground": "#0B1220",
+  "core": {
+    "library": "libXray",
+    "license": "MIT",
+    "androidArtifact": "libxray-android.zip",
+    "appleArtifact": "libxray-apple-cgo.zip"
+  }
+}
