@@ -7,6 +7,11 @@ on:
     tags:
       - 'v*'
 
+# Одна Android-сборка за раз: параллельный build.yml ловил 429 от Maven Central.
+concurrency:
+  group: curie-android-build
+  cancel-in-progress: false
+
 permissions:
   contents: write
 

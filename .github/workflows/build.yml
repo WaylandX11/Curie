@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Gradle качает kotlin-gradle-dsl с Maven Central; параллельные сборки
+# получают 429 Too Many Requests. Одна сборка за раз, без отмены.
+concurrency:
+  group: curie-android-build
+  cancel-in-progress: false
+
 jobs:
   android:
     runs-on: ubuntu-latest
