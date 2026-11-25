@@ -11,6 +11,8 @@ void main() {
     expect(AppTheme.fromId('dark'), AppTheme.dark);
     expect(AppTheme.fromId('light'), AppTheme.light);
     expect(AppTheme.fromId('amber'), AppTheme.amber);
+    expect(AppTheme.fromId('vanilla'), AppTheme.vanilla);
+    expect(AppTheme.fromId('pink'), AppTheme.pink);
     expect(AppTheme.fromId('unknown'), AppTheme.dark);
   });
 
@@ -21,6 +23,8 @@ void main() {
     }
     expect(AppTheme.light.brightness, Brightness.light);
     expect(AppTheme.forest.brightness, Brightness.light);
+    expect(AppTheme.vanilla.brightness, Brightness.light);
+    expect(AppTheme.pink.brightness, Brightness.light);
     expect(AppTheme.dark.brightness, Brightness.dark);
     expect(AppTheme.amber.brightness, Brightness.dark);
     expect(AppTheme.ocean.brightness, Brightness.dark);
@@ -36,6 +40,10 @@ void main() {
     expect(ThemeController.theme.value, AppTheme.ocean);
     await ThemeController.toggle();
     expect(ThemeController.theme.value, AppTheme.forest);
+    await ThemeController.toggle();
+    expect(ThemeController.theme.value, AppTheme.vanilla);
+    await ThemeController.toggle();
+    expect(ThemeController.theme.value, AppTheme.pink);
     await ThemeController.toggle();
     expect(ThemeController.theme.value, AppTheme.dark);
   });

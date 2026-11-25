@@ -18,6 +18,16 @@ void main() {
     );
   });
 
+  test('Android version is part of the user agent', () async {
+    expect(
+      await currentUserAgent(
+        xray: _FakeXray(),
+        platformPart: () async => 'Android17',
+      ),
+      'Curie/$buildStamp/1.8.6/Android17',
+    );
+  });
+
   test('user agent has app, Xray core and OS parts', () {
     expect(
       formatUserAgent(
@@ -29,6 +39,17 @@ void main() {
     );
   });
 
+  test('a leading v in the core version is removed', () {
+    expect(
+      formatUserAgent(
+        appVersion: '26.11.25.1000',
+        xrayVersion: 'v26.11.9',
+        platform: 'Android17',
+      ),
+      'Curie/26.11.25.1000/26.11.9/Android17',
+    );
+  });
+
   test('missing core version falls back to the bundled libXray version', () {
     expect(
       formatUserAgent(
@@ -36,7 +57,7 @@ void main() {
         xrayVersion: '',
         platform: 'ios',
       ),
-      'Curie/26.11.24.1513/v26.11.9/ios',
+      'Curie/26.11.24.1513/26.11.9/ios',
     );
     expect(
       formatUserAgent(

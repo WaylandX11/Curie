@@ -18,14 +18,34 @@ String buildXrayConfig({
   Map<String, dynamic>? base,
   int metricsPort = 49227,
   int checkPort = 0,
+  String logPath = '',
 }) {
   final config = <String, dynamic>{
     ...?base,
   };
 
-  config['log'] = {'loglevel': 'warning'};
+  // Ключ именно `logLevel`: старый `loglevel` ядро не понимало и молча
+  // использовало warning. При выключенном журнале levels none отключает и
+  // stdout, и запись в файл.
+  final logging = settings.xrayLogEnabled &&
+      settings.xrayLogLevel != XrayLogLevel.none &&
+      logPath.isNotEmpty;
+  config['log'] = logging
+      ? {
+          'logLevel': settings.xrayLogLevel.wireName,
+          'error': logPath,
+          'access': 'none',
+          // Это строка в Xray-core: `true` не парсится и ломает весь конфиг.
+          // `full` маскирует ipv4 и ipv6 полностью.
+          'maskAddress': 'full',
+        }
+      : {
+          'logLevel': 'none',
+          'error': 'none',
+          'access': 'none',
+        };
 
-  // Счётчики трафика для индикатора ↑/↓. Метрики читаются локально,
+  // Счётчики трафика для индикатора скорости. Метрики читаются локально,
   // через 127.0.0.1, и не создают ещё одного слушателя наружу.
   config['metrics'] = {'listen': '127.0.0.1:$metricsPort'};
   config['stats'] = <String, dynamic>{};

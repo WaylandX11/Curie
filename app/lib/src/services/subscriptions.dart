@@ -4,6 +4,7 @@ import 'device_identity.dart';
 import 'store.dart';
 import 'subscription_service.dart';
 import 'user_agent.dart';
+import 'vpn.dart';
 
 /// Операции над подписками: сеть + сохранение состояния.
 class Subscriptions {
@@ -27,6 +28,7 @@ class Subscriptions {
         draft,
         headers: await DeviceIdentity.headers(),
         userAgent: await currentUserAgent(),
+        proxyPort: Vpn.tunnelProxyPort,
       );
       await Store.instance.update((state) => state.copyWith(
             subscriptions: [...state.subscriptions, loaded],
@@ -45,6 +47,7 @@ class Subscriptions {
         subscription,
         headers: await DeviceIdentity.headers(),
         userAgent: await currentUserAgent(),
+        proxyPort: Vpn.tunnelProxyPort,
       );
       await _replace(loaded);
       AppLog.add('subscription', 'обновлена: ${loaded.title} (узлов: ${loaded.nodes.length})');
@@ -67,10 +70,15 @@ class Subscriptions {
     }
   }
 
-  static Future<List<SubscriptionException>> refreshAll({bool onlyStale = false}) async {
+  static Future<List<SubscriptionException>> refreshAll({
+    bool onlyStale = false,
+    int? intervalHours,
+  }) async {
     final errors = <SubscriptionException>[];
     for (final subscription in Store.instance.state.value.subscriptions) {
-      if (onlyStale && !subscription.isStale) continue;
+      if (onlyStale && !subscription.isStale(overrideHours: intervalHours)) {
+        continue;
+      }
       final error = await refresh(subscription);
       if (error != null) errors.add(error);
     }

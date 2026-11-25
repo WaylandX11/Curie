@@ -10,6 +10,10 @@ class TrafficSample {
 
   final int up;
   final int down;
+
+  /// В интерфейсе показываем одну суммарную скорость: стрелки ↑/↓ смущали,
+  /// когда один из счётчиков подолгу оставался нулевым.
+  int get total => up + down;
 }
 
 /// Читает счётчики Xray из метрик ядра.
@@ -70,10 +74,6 @@ class Traffic extends ValueNotifier<TrafficSample> {
     if (_timer != null && _port == port) return;
     _stop();
     _port = port;
-    _lastAt = null;
-    _lastUp = null;
-    _lastDown = null;
-    value = const TrafficSample();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _poll());
     _poll();
   }
@@ -81,10 +81,16 @@ class Traffic extends ValueNotifier<TrafficSample> {
   void _stop() {
     _timer?.cancel();
     _timer = null;
+    _resetSample();
+  }
+
+  void _resetSample() {
     _lastAt = null;
     _lastUp = null;
     _lastDown = null;
-    value = const TrafficSample();
+    if (value.up != 0 || value.down != 0) {
+      value = const TrafficSample();
+    }
   }
 
   Future<void> _poll() async {
@@ -97,6 +103,7 @@ class Traffic extends ValueNotifier<TrafficSample> {
       );
       if (response.statusCode != 200) {
         await response.drain<void>();
+        _resetSample();
         return;
       }
       final body = await utf8.decoder.bind(response).join();
@@ -115,6 +122,10 @@ class Traffic extends ValueNotifier<TrafficSample> {
             up: (up / seconds).round(),
             down: (down / seconds).round(),
           );
+        } else {
+          // Счётчики обнулились при перезапуске ядра — старая скорость больше
+          // не имеет отношения к действительности.
+          _resetSample();
         }
       }
       _lastUp = totals.up;
@@ -122,7 +133,9 @@ class Traffic extends ValueNotifier<TrafficSample> {
       _lastAt = now;
     } on Object {
       // Метрики — необязательная деталь интерфейса: ядро могло ещё не
-      // поднять сервер, порт занят или соединение закрылось. Не шумим в журнал.
+      // поднять сервер, порт занят или соединение закрылось. Не шумим в журнал,
+      // но и не показываем последнюю скорость как текущую.
+      _resetSample();
     }
   }
 }

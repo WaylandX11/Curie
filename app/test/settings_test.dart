@@ -71,6 +71,44 @@ void main() {
     expect(restored.mtu, 1400);
   });
 
+  test('new scheduler and log settings survive a storage round trip', () {
+    const settings = Settings(
+      subscriptionUpdateHours: 6,
+      xrayLogEnabled: false,
+      xrayLogLevel: XrayLogLevel.error,
+      xrayLogRetentionHours: 72,
+      lastNotifiedCoreVersion: '26.11.9',
+      pendingUpdate: '{"version":"26.11.25.0900"}',
+    );
+    final restored = Settings.fromJson(settings.toJson());
+
+    expect(restored.subscriptionUpdateHours, 6);
+    expect(restored.xrayLogEnabled, isFalse);
+    expect(restored.xrayLogLevel, XrayLogLevel.error);
+    expect(restored.xrayLogRetentionHours, 72);
+    expect(restored.lastNotifiedCoreVersion, '26.11.9');
+    expect(restored.pendingUpdate, '{"version":"26.11.25.0900"}');
+  });
+
+  test('manual hours are clamped to a sane range', () {
+    final low = Settings.fromJson({'subscriptionUpdateHours': 0, 'xrayLogRetentionHours': 0});
+    expect(low.subscriptionUpdateHours, Settings.minSubscriptionUpdateHours);
+    expect(low.xrayLogRetentionHours, Settings.minLogRetentionHours);
+
+    final high = Settings.fromJson({
+      'subscriptionUpdateHours': 9999,
+      'xrayLogRetentionHours': 9999,
+    });
+    expect(high.subscriptionUpdateHours, Settings.maxSubscriptionUpdateHours);
+    expect(high.xrayLogRetentionHours, Settings.maxLogRetentionHours);
+  });
+
+  test('clearPendingUpdate removes the saved banner', () {
+    const settings = Settings(pendingUpdate: 'stale');
+    expect(settings.copyWith(clearPendingUpdate: true).pendingUpdate, isNull);
+    expect(settings.copyWith(pendingUpdate: 'fresh').pendingUpdate, 'fresh');
+  });
+
   test('ping mode survives storage and old ICMP migrates to TCP', () {
     expect(PingMode.fromName('icmp'), PingMode.tcp);
     expect(PingMode.fromName('tcp'), PingMode.tcp);

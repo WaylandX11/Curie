@@ -42,6 +42,13 @@ jobs:
           mkdir -p app/android/app/libs
           unzip -o -j /tmp/core.zip -d app/android/app/libs
 
+      - name: Expose core version for release notes
+        id: core
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       # NDK не нужен: libXray.aar содержит готовые .so, своего нативного кода нет.
 
       - name: Analyze and test
@@ -76,6 +83,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            Xray-core: ${{ steps.core.outputs.version }}
+            libXray: ${{ steps.core.outputs.version }}
           files: |
             curie-*.apk
             curie-*.apk.sha256

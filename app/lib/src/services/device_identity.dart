@@ -5,8 +5,8 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
+import '../generated/build_info.dart';
 import 'store.dart';
 
 /// Идентификатор устройства для панелей с лимитом устройств (Remnawave HWID).
@@ -144,8 +144,8 @@ class DeviceIdentity {
         headers['x-ver-os'] = ios.systemVersion;
         headers['x-device-model'] = ios.utsname.machine;
       }
-      final package = await PackageInfo.fromPlatform();
-      headers['x-app-version'] = package.version;
+      // Не PackageInfo: он может вернуть версию прежней установленной сборки.
+      headers['x-app-version'] = buildStamp;
     } on Object {
       // Панели обязателен только x-hwid, остальное — по возможности.
     }

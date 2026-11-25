@@ -9,7 +9,8 @@ import 'app_log.dart';
 enum VpnStatus { disconnected, connecting, connected, disconnecting, error }
 
 /// Управление туннелем. Статус приходит пушем из Kotlin (`stateChanged`),
-/// поэтому UI не опрашивает сервис в цикле.
+/// поэтому UI не опрашивает сервис в цикле. Сессия (порты, время старта)
+/// хранится в нативном слое и переживает пересоздание Flutter-виджетов.
 class Vpn {
   static const MethodChannel _channel = MethodChannel(
     'io.github.waylandx11.curie/bridge',
@@ -20,7 +21,18 @@ class Vpn {
   );
   static final ValueNotifier<String?> lastError = ValueNotifier(null);
 
+  /// Локальный HTTP-прокси Xray, через который идут фоновые запросы приложения.
+  /// Открыт только когда туннель реально подключён.
+  static final ValueNotifier<int> outboundProxyPort = ValueNotifier(0);
+  static final ValueNotifier<int> metricsPort = ValueNotifier(0);
+  static final ValueNotifier<DateTime?> connectedAt = ValueNotifier(null);
+
   static bool get isSupported => Platform.isAndroid;
+
+  /// Порт для обновлений: 0, когда туннель не работает.
+  static int get tunnelProxyPort => status.value == VpnStatus.connected
+      ? outboundProxyPort.value
+      : 0;
 
   static Future<void>? _ready;
 
@@ -30,9 +42,7 @@ class Vpn {
     if (!isSupported) return;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'stateChanged' && call.arguments is Map) {
-        final args = (call.arguments as Map).cast<String, dynamic>();
-        status.value = _statusFromName(args['status'] as String?);
-        lastError.value = args['error'] as String?;
+        _apply((call.arguments as Map).cast<String, dynamic>());
       }
       if (call.method == 'log' && call.arguments is Map) {
         final args = (call.arguments as Map).cast<String, dynamic>();
@@ -40,17 +50,37 @@ class Vpn {
       }
       return null;
     });
+    await refresh();
+  }
+
+  /// Перечитать состояние сервиса. Вызывается при возврате в приложение:
+  /// пуш мог быть пропущен, пока Flutter-изолят был в фоне.
+  static Future<void> refresh() async {
+    if (!isSupported) return;
     try {
       final state = await _channel.invokeMapMethod<String, dynamic>('status');
-      if (state != null) {
-        status.value = _statusFromName(state['status'] as String?);
-        lastError.value = state['error'] as String?;
-      }
+      if (state != null) _apply(state);
     } on PlatformException {
       // Канал ещё не готов — остаёмся в исходном состоянии.
     } on MissingPluginException {
       // Не Android.
     }
+  }
+
+  static void _apply(Map<String, dynamic> args) {
+    final next = _statusFromName(args['status'] as String?);
+    final active = next == VpnStatus.connected;
+    final started = (args['connectedAt'] as num?)?.toInt();
+
+    // Сначала порты и время старта, затем статус: слушатели статуса
+    // (TunnelMonitor и экран) должны сразу видеть готовую сессию.
+    outboundProxyPort.value = active ? (args['check'] as num?)?.toInt() ?? 0 : 0;
+    metricsPort.value = active ? (args['metrics'] as num?)?.toInt() ?? 0 : 0;
+    connectedAt.value = active && started != null && started > 0
+        ? DateTime.fromMillisecondsSinceEpoch(started)
+        : null;
+    lastError.value = args['error'] as String?;
+    status.value = next;
   }
 
   static Future<void> connect({
@@ -74,12 +104,12 @@ class Vpn {
   static Future<void> disconnect() => _channel.invokeMethod<void>('disconnect');
 
   static VpnStatus _statusFromName(String? name) => switch (name) {
-    'connecting' => VpnStatus.connecting,
-    'connected' => VpnStatus.connected,
-    'disconnecting' => VpnStatus.disconnecting,
-    'error' => VpnStatus.error,
-    _ => VpnStatus.disconnected,
-  };
+        'connecting' => VpnStatus.connecting,
+        'connected' => VpnStatus.connected,
+        'disconnecting' => VpnStatus.disconnecting,
+        'error' => VpnStatus.error,
+        _ => VpnStatus.disconnected,
+      };
 }
 
 class VpnException implements Exception {

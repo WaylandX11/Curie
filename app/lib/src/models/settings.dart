@@ -81,6 +81,26 @@ enum DnsRoute {
   String get wireName => name;
 }
 
+/// Уровень журнала ядра. Значения совпадают с `log.logLevel` в Xray-core:
+/// `debug`, `info`, `warning`, `error`, `none`.
+enum XrayLogLevel {
+  debug,
+  info,
+  warning,
+  error,
+  none;
+
+  static XrayLogLevel fromName(String? name) => switch (name) {
+        'debug' => XrayLogLevel.debug,
+        'info' => XrayLogLevel.info,
+        'error' => XrayLogLevel.error,
+        'none' => XrayLogLevel.none,
+        _ => XrayLogLevel.warning,
+      };
+
+  String get wireName => name;
+}
+
 class Settings {
   /// Резервный DNS на случай, когда подписка не прислала свои серверы.
   /// Само значение по умолчанию теперь — DNS из подписки (`dnsUsePanel`).
@@ -98,6 +118,17 @@ class Settings {
   static const minPingTimeout = 5;
   static const maxPingTimeout = 15;
 
+  /// Ручной интервал автообновления подписок. Панель всё равно сообщает свой
+  /// `profile-update-interval`, но пользовательский выбор важнее.
+  static const defaultSubscriptionUpdateHours = 1;
+  static const minSubscriptionUpdateHours = 1;
+  static const maxSubscriptionUpdateHours = 168;
+
+  /// Журнал ядра пишется в приватный каталог приложения и очищается по времени.
+  static const defaultLogRetentionHours = 24;
+  static const minLogRetentionHours = 1;
+  static const maxLogRetentionHours = 168;
+
   const Settings({
     this.routingMode = RoutingMode.all,
     this.allowedApps = const [],
@@ -107,12 +138,19 @@ class Settings {
     this.dnsRoute = DnsRoute.tunnel,
     this.bypassLan = true,
     this.autoUpdateSubscriptions = true,
+    this.subscriptionUpdateHours = defaultSubscriptionUpdateHours,
     this.sendHwid = true,
     this.pingMode = PingMode.proxy,
     this.pingProfile = PingProfile.single,
     this.pingTimeoutSeconds = minPingTimeout,
     this.pingUrl = defaultPingUrl,
     this.mtu = 1500,
+    this.xrayLogEnabled = true,
+    this.xrayLogLevel = XrayLogLevel.warning,
+    this.xrayLogRetentionHours = defaultLogRetentionHours,
+    this.lastUpdateCheckAt,
+    this.lastNotifiedCoreVersion,
+    this.pendingUpdate,
     this.defaultsRevision = currentDefaultsRevision,
   });
 
@@ -127,6 +165,10 @@ class Settings {
   final DnsRoute dnsRoute;
   final bool bypassLan;
   final bool autoUpdateSubscriptions;
+
+  /// Во сколько часов обновлять подписки, когда автообновление включено.
+  /// Перекрывает интервал из заголовка панели.
+  final int subscriptionUpdateHours;
 
   /// Отправлять панели идентификатор устройства. Включено по умолчанию:
   /// многие панели требуют HWID для лимита устройств. Отключается в настройках.
@@ -146,6 +188,21 @@ class Settings {
 
   final int mtu;
 
+  /// Писать ошибки и предупреждения ядра в приватный файл. Адреса в журнале
+  /// маскируются конфигом Xray (`maskAddress`).
+  final bool xrayLogEnabled;
+  final XrayLogLevel xrayLogLevel;
+  final int xrayLogRetentionHours;
+
+  /// Служебные отметки для проверки обновлений раз в сутки и правила
+  /// «один диалог на версию ядра».
+  final DateTime? lastUpdateCheckAt;
+  final String? lastNotifiedCoreVersion;
+
+  /// Сериализованный `GithubRelease`, который показываем баннером на главной.
+  /// Живёт в зашифрованном состоянии, чтобы баннер переживал перезапуск.
+  final String? pendingUpdate;
+
   /// Служебное поле для одноразовой миграции значений по умолчанию.
   final int defaultsRevision;
 
@@ -161,12 +218,20 @@ class Settings {
     DnsRoute? dnsRoute,
     bool? bypassLan,
     bool? autoUpdateSubscriptions,
+    int? subscriptionUpdateHours,
     bool? sendHwid,
     PingMode? pingMode,
     PingProfile? pingProfile,
     int? pingTimeoutSeconds,
     String? pingUrl,
     int? mtu,
+    bool? xrayLogEnabled,
+    XrayLogLevel? xrayLogLevel,
+    int? xrayLogRetentionHours,
+    DateTime? lastUpdateCheckAt,
+    String? lastNotifiedCoreVersion,
+    String? pendingUpdate,
+    bool clearPendingUpdate = false,
   }) =>
       Settings(
         routingMode: routingMode ?? this.routingMode,
@@ -177,12 +242,21 @@ class Settings {
         dnsRoute: dnsRoute ?? this.dnsRoute,
         bypassLan: bypassLan ?? this.bypassLan,
         autoUpdateSubscriptions: autoUpdateSubscriptions ?? this.autoUpdateSubscriptions,
+        subscriptionUpdateHours:
+            subscriptionUpdateHours ?? this.subscriptionUpdateHours,
         sendHwid: sendHwid ?? this.sendHwid,
         pingMode: pingMode ?? this.pingMode,
         pingProfile: pingProfile ?? this.pingProfile,
         pingTimeoutSeconds: pingTimeoutSeconds ?? this.pingTimeoutSeconds,
         pingUrl: pingUrl ?? this.pingUrl,
         mtu: mtu ?? this.mtu,
+        xrayLogEnabled: xrayLogEnabled ?? this.xrayLogEnabled,
+        xrayLogLevel: xrayLogLevel ?? this.xrayLogLevel,
+        xrayLogRetentionHours: xrayLogRetentionHours ?? this.xrayLogRetentionHours,
+        lastUpdateCheckAt: lastUpdateCheckAt ?? this.lastUpdateCheckAt,
+        lastNotifiedCoreVersion:
+            lastNotifiedCoreVersion ?? this.lastNotifiedCoreVersion,
+        pendingUpdate: clearPendingUpdate ? null : (pendingUpdate ?? this.pendingUpdate),
       );
 
   Map<String, dynamic> toJson() => {
@@ -194,12 +268,21 @@ class Settings {
         'dnsRoute': dnsRoute.wireName,
         'bypassLan': bypassLan,
         'autoUpdateSubscriptions': autoUpdateSubscriptions,
+        'subscriptionUpdateHours': subscriptionUpdateHours,
         'sendHwid': sendHwid,
         'pingMode': pingMode.wireName,
         'pingProfile': pingProfile.wireName,
         'pingTimeoutSeconds': pingTimeoutSeconds,
         'pingUrl': pingUrl,
         'mtu': mtu,
+        'xrayLogEnabled': xrayLogEnabled,
+        'xrayLogLevel': xrayLogLevel.wireName,
+        'xrayLogRetentionHours': xrayLogRetentionHours,
+        if (lastUpdateCheckAt != null)
+          'lastUpdateCheckAt': lastUpdateCheckAt!.millisecondsSinceEpoch,
+        if (lastNotifiedCoreVersion != null)
+          'lastNotifiedCoreVersion': lastNotifiedCoreVersion,
+        if (pendingUpdate != null) 'pendingUpdate': pendingUpdate,
         'defaultsRevision': defaultsRevision,
       };
 
@@ -208,6 +291,10 @@ class Settings {
     final legacyDefault = savedDns == legacyDefaultDns;
     final savedTimeout = (json['pingTimeoutSeconds'] as num?)?.toInt();
     final savedUrl = json['pingUrl'] as String?;
+    final hours = (json['subscriptionUpdateHours'] as num?)?.toInt() ??
+        defaultSubscriptionUpdateHours;
+    final retention = (json['xrayLogRetentionHours'] as num?)?.toInt() ??
+        defaultLogRetentionHours;
     final savedRevision = (json['defaultsRevision'] as num?)?.toInt() ?? 0;
     final upgradeDefaults = savedRevision < currentDefaultsRevision;
     // Старый адрес по умолчанию не считается осознанным выбором пользователя.
@@ -231,6 +318,11 @@ class Settings {
       dnsRoute: DnsRoute.fromName(json['dnsRoute'] as String?),
       bypassLan: (json['bypassLan'] as bool?) ?? true,
       autoUpdateSubscriptions: (json['autoUpdateSubscriptions'] as bool?) ?? true,
+      subscriptionUpdateHours: hours < minSubscriptionUpdateHours
+          ? minSubscriptionUpdateHours
+          : (hours > maxSubscriptionUpdateHours
+              ? maxSubscriptionUpdateHours
+              : hours),
       // HWID включаем и для уже установленных приложений, но только один раз:
       // последующий ручной выключатель остаётся в силе.
       sendHwid: upgradeDefaults ? true : (json['sendHwid'] as bool? ?? true),
@@ -245,6 +337,20 @@ class Settings {
           ? defaultPingUrl
           : savedUrl.trim(),
       mtu: (json['mtu'] as num?)?.toInt() ?? 1500,
+      xrayLogEnabled: (json['xrayLogEnabled'] as bool?) ?? true,
+      xrayLogLevel: XrayLogLevel.fromName(json['xrayLogLevel'] as String?),
+      xrayLogRetentionHours: retention < minLogRetentionHours
+          ? minLogRetentionHours
+          : (retention > maxLogRetentionHours
+              ? maxLogRetentionHours
+              : retention),
+      lastUpdateCheckAt: json['lastUpdateCheckAt'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              (json['lastUpdateCheckAt'] as num).toInt(),
+            ),
+      lastNotifiedCoreVersion: json['lastNotifiedCoreVersion'] as String?,
+      pendingUpdate: json['pendingUpdate'] as String?,
       defaultsRevision: currentDefaultsRevision,
     );
   }

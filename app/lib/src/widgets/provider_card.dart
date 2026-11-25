@@ -16,6 +16,7 @@ class ProviderCard extends StatefulWidget {
     required this.profiles,
     required this.selectedId,
     required this.onSelect,
+    required this.updateHours,
     this.subscription,
     this.onRefresh,
     this.onPing,
@@ -28,6 +29,11 @@ class ProviderCard extends StatefulWidget {
   final List<Profile> profiles;
   final String? selectedId;
   final ValueChanged<Profile> onSelect;
+
+  /// Реально настроенный интервал обновления из настроек приложения.
+  /// Не рекомендация панели из [Subscription.updateIntervalHours].
+  final int updateHours;
+
   final Subscription? subscription;
   final Future<void> Function()? onRefresh;
   final VoidCallback? onPing;
@@ -119,7 +125,7 @@ class _ProviderCardState extends State<ProviderCard> {
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
                             l10n.fmt('updateEvery', {
-                              'hours': subscription.updateIntervalHours,
+                              'hours': widget.updateHours,
                             }),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,

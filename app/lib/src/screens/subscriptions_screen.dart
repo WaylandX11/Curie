@@ -135,7 +135,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
                 for (final subscription in state.subscriptions)
-                  _card(context, subscription),
+                  _card(
+                    context,
+                    subscription,
+                    state.settings.subscriptionUpdateHours,
+                  ),
               ],
             );
           },
@@ -144,7 +148,11 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     );
   }
 
-  Widget _card(BuildContext context, Subscription subscription) {
+  Widget _card(
+    BuildContext context,
+    Subscription subscription,
+    int updateHours,
+  ) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final info = subscription.info;
@@ -152,7 +160,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
     final subtitle = <String>[
       l10n.fmt('nodesCount', {'count': subscription.nodes.length}),
-      l10n.fmt('updateEvery', {'hours': subscription.updateIntervalHours}),
+      l10n.fmt('updateEvery', {'hours': updateHours}),
       if (subscription.updatedAt != null)
         l10n.fmt('updated', {'time': formatDateTime(subscription.updatedAt!)})
       else

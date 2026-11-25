@@ -372,4 +372,41 @@ void main() {
       contains('direct'),
     );
   });
+
+  test('Xray logs use logLevel and a masked private file', () {
+    const path = '/data/user/0/io.github.waylandx11.curie/files/curie-xray.log';
+    final config = jsonDecode(buildXrayConfig(
+      outbounds: [serverOutbound],
+      settings: const Settings(
+        xrayLogEnabled: true,
+        xrayLogLevel: XrayLogLevel.debug,
+      ),
+      logPath: path,
+    )) as Map<String, dynamic>;
+    final log = (config['log'] as Map).cast<String, dynamic>();
+
+    expect(log['logLevel'], 'debug', reason: 'Xray ignores lowercase loglevel');
+    expect(log['error'], path);
+    expect(log['access'], 'none');
+    expect(
+      log['maskAddress'],
+      'full',
+      reason: 'Xray parsing expects a mask string, not a bool',
+    );
+  });
+
+  test('disabled or pathless logging writes nothing', () {
+    final disabled = jsonDecode(buildXrayConfig(
+      outbounds: [serverOutbound],
+      settings: const Settings(xrayLogEnabled: false),
+      logPath: '/some/path',
+    )) as Map<String, dynamic>;
+    expect((disabled['log'] as Map)['logLevel'], 'none');
+    expect((disabled['log'] as Map)['error'], 'none');
+
+    final noPath = jsonDecode(buildXrayConfig(
+      outbounds: [serverOutbound],
+    )) as Map<String, dynamic>;
+    expect((noPath['log'] as Map)['error'], 'none');
+  });
 }

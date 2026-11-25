@@ -12,7 +12,9 @@ enum AppTheme {
   light('light'),
   amber('amber'),
   ocean('ocean'),
-  forest('forest');
+  forest('forest'),
+  vanilla('vanilla'),
+  pink('pink');
 
   const AppTheme(this.id);
 
@@ -24,7 +26,10 @@ enum AppTheme {
       );
 
   Brightness get brightness => switch (this) {
-        AppTheme.light || AppTheme.forest => Brightness.light,
+        AppTheme.light ||
+        AppTheme.forest ||
+        AppTheme.vanilla ||
+        AppTheme.pink => Brightness.light,
         _ => Brightness.dark,
       };
 
@@ -34,6 +39,8 @@ enum AppTheme {
         AppTheme.amber => 'themeAmber',
         AppTheme.ocean => 'themeOcean',
         AppTheme.forest => 'themeForest',
+        AppTheme.vanilla => 'themeVanilla',
+        AppTheme.pink => 'themePink',
       };
 }
 
@@ -110,6 +117,24 @@ _Spec _specOf(AppTheme theme) => switch (theme) {
           primary: const Color(0xFF2E7D32),
           secondary: const Color(0xFF00897B),
           good: const Color(0xFF1B5E20),
+        ),
+      // «Ваниль»: почти исходная кремовая тема, но чуть глубже по тонам.
+      AppTheme.vanilla => (
+          seed: const Color(0xFFF0C078),
+          background: const Color(0xFFF8EDD2),
+          surface: const Color(0xFFFFF9EC),
+          primary: const Color(0xFF7A4700),
+          secondary: const Color(0xFFA86A00),
+          good: const Color(0xFF2E7D32),
+        ),
+      // «Розовая»: светлая розовая, чуть темнее первого варианта.
+      AppTheme.pink => (
+          seed: const Color(0xFFEC9AB4),
+          background: const Color(0xFFF8DFE9),
+          surface: const Color(0xFFFFEFF5),
+          primary: const Color(0xFFA8134E),
+          secondary: const Color(0xFFC2185B),
+          good: const Color(0xFF2E7D32),
         ),
     };
 

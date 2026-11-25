@@ -2,13 +2,14 @@ package io.github.waylandx11.curie
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import io.flutter.plugin.common.MethodChannel
 
 /**
  * Состояние туннеля, общее для сервиса и Flutter-слоя.
  *
- * Сервис живёт дольше Activity, поэтому статус хранится здесь, а не в канале:
- * после перезапуска UI достаточно спросить `status`, чтобы узнать правду.
+ * Сервис живёт дольше Activity, поэтому статус и параметры сессии хранятся
+ * здесь, а не в канале: после перезапуска UI достаточно спросить `status`.
  */
 object CurieBridge {
     const val STATUS_DISCONNECTED = "disconnected"
@@ -28,16 +29,47 @@ object CurieBridge {
     var lastError: String? = null
         private set
 
+    @Volatile
+    private var metricsPort: Int = 0
+
+    @Volatile
+    private var checkPort: Int = 0
+
+    @Volatile
+    private var connectedAtMs: Long = 0
+
     private val main = Handler(Looper.getMainLooper())
 
     fun attach(channel: MethodChannel) {
         this.channel = channel
     }
 
+    fun setSession(metricsPort: Int, checkPort: Int) {
+        this.metricsPort = metricsPort
+        this.checkPort = checkPort
+        this.connectedAtMs = System.currentTimeMillis()
+    }
+
+    fun clearSession() {
+        metricsPort = 0
+        checkPort = 0
+        connectedAtMs = 0
+    }
+
+    fun session(): Map<String, Any?> = mapOf(
+        "metrics" to metricsPort,
+        "check" to checkPort,
+        "connectedAt" to connectedAtMs
+    )
+
     fun emit(status: String, error: String? = null) {
         this.status = status
         this.lastError = error
-        val payload = mapOf("status" to status, "error" to error)
+        val payload = HashMap<String, Any?>().apply {
+            put("status", status)
+            put("error", error)
+            putAll(session())
+        }
         main.post { channel?.invokeMethod("stateChanged", payload) }
     }
 

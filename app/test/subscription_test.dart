@@ -191,15 +191,23 @@ not a link
 
   test('subscription is stale until updated', () {
     const fresh = Subscription(url: 'https://panel/sub', title: 'Panel');
-    expect(fresh.isStale, isTrue);
+    expect(fresh.isStale(), isTrue);
 
     final updated = fresh.copyWith(updatedAt: DateTime.now(), updateIntervalHours: 12);
-    expect(updated.isStale, isFalse);
+    expect(updated.isStale(), isFalse);
 
     final old = fresh.copyWith(
       updatedAt: DateTime.now().subtract(const Duration(hours: 13)),
     );
-    expect(old.isStale, isTrue);
+    expect(old.isStale(), isTrue);
+
+    // Ручной интервал из настроек важнее значения, присланного панелью.
+    final older = updated.copyWith(
+      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
+    );
+    expect(older.isStale(overrideHours: 1), isTrue);
+    expect(older.isStale(overrideHours: 12), isFalse);
+    expect(old.isStale(overrideHours: 24), isFalse);
   });
 
   test('subscription survives a storage round trip', () {

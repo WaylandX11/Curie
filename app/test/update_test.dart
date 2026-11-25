@@ -59,4 +59,22 @@ void main() {
       isTrue,
     );
   });
+
+  test('core version is read from generated release notes', () {
+    final release = GithubUpdate.parseRelease({
+      'tag_name': 'v26.11.25.0900-alpha',
+      'html_url': 'page',
+      'body': 'Xray-core: v26.11.9\nlibXray: v26.11.9',
+    });
+    expect(release.coreVersion, '26.11.9');
+    expect(GithubUpdate.parseCoreVersion('без версии ядра'), isNull);
+  });
+
+  test('core versions are compared by parts', () {
+    expect(GithubUpdate.isNewerCore('26.11.10', '26.11.9'), isTrue);
+    expect(GithubUpdate.isNewerCore('26.12.1', '26.11.9'), isTrue);
+    expect(GithubUpdate.isNewerCore('27.1.0', '26.11.9'), isTrue);
+    expect(GithubUpdate.isNewerCore('v26.11.9', '26.11.9'), isFalse);
+    expect(GithubUpdate.isNewerCore('26.11.8', '26.11.9'), isFalse);
+  });
 }

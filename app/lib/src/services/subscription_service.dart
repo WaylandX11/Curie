@@ -48,6 +48,7 @@ class SubscriptionService {
     Subscription subscription, {
     Map<String, String> headers = const {},
     String userAgent = 'Curie',
+    int proxyPort = 0,
   }) async {
     final baseUri = Uri.parse(subscription.url);
     final jsonUri = requestUri(subscription.url);
@@ -67,6 +68,7 @@ class SubscriptionService {
           candidates[i],
           headers: headers,
           userAgent: userAgent,
+          proxyPort: proxyPort,
         );
         final parsed = await _nodes(result.body, result.contentType, subscription.url);
         if (parsed.isEmpty) throw const SubscriptionException('noNodes');
@@ -122,8 +124,15 @@ class SubscriptionService {
     Uri uri, {
     required Map<String, String> headers,
     required String userAgent,
+    required int proxyPort,
   }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      // Curie исключён из собственного TUN. Когда туннель поднят, панель
+      // обновляем через локальный HTTP-прокси Xray; иначе — напрямую.
+      ..findProxy = (_) => proxyPort > 0
+          ? 'PROXY 127.0.0.1:$proxyPort'
+          : 'DIRECT';
     try {
       final request = await client.getUrl(uri);
       request.headers.set(HttpHeaders.userAgentHeader, userAgent);

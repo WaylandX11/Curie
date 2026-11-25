@@ -1,11 +1,12 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/main_shell.dart';
-import 'services/app_log.dart';
 import 'services/locale_controller.dart';
-import 'services/store.dart';
-import 'services/subscriptions.dart';
+import 'services/schedulers.dart';
 import 'services/theme_controller.dart';
 import 'theme.dart';
 
@@ -16,26 +17,32 @@ class CurieApp extends StatefulWidget {
   State<CurieApp> createState() => _CurieAppState();
 }
 
-class _CurieAppState extends State<CurieApp> {
+class _CurieAppState extends State<CurieApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // Подписки обновляем после первого кадра: сеть не должна задерживать UI.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoUpdate());
+    WidgetsBinding.instance.addObserver(this);
+    // Сеть не должна задерживать первый кадр. На iOS/в тестах планировщик
+    // не поднимаем: приложение пока Android-only.
+    if (Platform.isAndroid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(CurieSchedulers.start());
+      });
+    }
   }
 
-  Future<void> _autoUpdate() async {
-    final state = Store.instance.state.value;
-    if (!state.settings.autoUpdateSubscriptions) return;
-    final due = state.subscriptions.where((s) => s.isStale).length;
-    AppLog.add(
-      'subscription',
-      'запуск: автообновление подписок (по интервалу: $due из '
-          '${state.subscriptions.length})',
-    );
-    // Интервал приходит вместе с подпиской (profile-update-interval) и
-    // хранится в зашифрованном состоянии; при запуске обновляем просроченные.
-    await Subscriptions.refreshAll(onlyStale: true);
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && Platform.isAndroid) {
+      // Догоняем подписки и проверку обновлений, пока приложение было в фоне.
+      unawaited(CurieSchedulers.resume());
+    }
   }
 
   @override

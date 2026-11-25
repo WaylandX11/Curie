@@ -61,5 +61,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(visibleTheme().brightness, Brightness.light);
     expect(visibleTheme().colorScheme.primary, const Color(0xFF2E7D32));
+
+    ThemeController.theme.value = AppTheme.vanilla;
+    await tester.pumpAndSettle();
+    expect(visibleTheme().brightness, Brightness.light);
+    expect(visibleTheme().colorScheme.primary, const Color(0xFF7A4700));
+    expect(visibleTheme().scaffoldBackgroundColor, const Color(0xFFF8EDD2));
+
+    ThemeController.theme.value = AppTheme.pink;
+    await tester.pumpAndSettle();
+    expect(visibleTheme().brightness, Brightness.light);
+    expect(visibleTheme().colorScheme.primary, const Color(0xFFA8134E));
+    expect(visibleTheme().scaffoldBackgroundColor, const Color(0xFFF8DFE9));
   });
 }

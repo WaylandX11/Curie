@@ -135,9 +135,12 @@ class Subscription {
         .toString();
   }
 
-  bool get isStale {
+  /// `overrideHours` приходит из пользовательской настройки и важнее значения
+  /// панели (`profile-update-interval`).
+  bool isStale({int? overrideHours}) {
     if (updatedAt == null) return true;
-    return DateTime.now().difference(updatedAt!).inHours >= updateIntervalHours;
+    final hours = overrideHours ?? updateIntervalHours;
+    return DateTime.now().difference(updatedAt!).inHours >= hours;
   }
 
   /// Свежий узел панели + правка пользователя (если была).

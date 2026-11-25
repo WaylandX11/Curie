@@ -34,4 +34,9 @@ void main() {
     expect(TrafficCounters.total('{}').down, 0);
     expect(TrafficCounters.total('{"stats":[]}').up, 0);
   });
+
+  test('UI has one total speed instead of two arrows', () {
+    expect(const TrafficSample(up: 100, down: 250).total, 350);
+    expect(const TrafficSample().total, 0);
+  });
 }

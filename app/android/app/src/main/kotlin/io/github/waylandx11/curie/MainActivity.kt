@@ -123,7 +123,11 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "status" -> result.success(
-                    mapOf("status" to CurieBridge.status, "error" to CurieBridge.lastError)
+                    HashMap<String, Any?>().apply {
+                        put("status", CurieBridge.status)
+                        put("error", CurieBridge.lastError)
+                        putAll(CurieBridge.session())
+                    }
                 )
 
                 // ANDROID_ID: стабилен для пары «устройство + подпись приложения»,
@@ -133,6 +137,16 @@ class MainActivity : FlutterActivity() {
                     runCatching {
                         Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
                     }.getOrNull()
+                )
+
+                // Версия ОС для User-Agent: Build.VERSION.RELEASE даёт «17»,
+                // а не внутренний SDK. ANDROID_ID и прочая идентификация тут не нужны.
+                "platformInfo" -> result.success(
+                    mapOf(
+                        "os" to "Android",
+                        "version" to Build.VERSION.RELEASE,
+                        "sdk" to Build.VERSION.SDK_INT
+                    )
                 )
 
                 "listApps" -> worker.execute {
@@ -238,7 +252,7 @@ class MainActivity : FlutterActivity() {
         return Intent(this, CurieVpnService::class.java).apply {
             action = CurieVpnService.ACTION_CONNECT
             putExtra(CurieVpnService.EXTRA_CONFIG, config)
-            putExtra(CurieVpnService.EXTRA_DNS, (args["dns"] as? String) ?: "1.1.1.1")
+            putExtra(CurieVpnService.EXTRA_DNS, (args["dns"] as? String) ?: "77.88.8.8")
             putExtra(CurieVpnService.EXTRA_MTU, (args["mtu"] as? Int) ?: 1500)
             putExtra(CurieVpnService.EXTRA_MODE, (args["mode"] as? String) ?: "all")
             putExtra(

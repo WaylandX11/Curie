@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import '../generated/build_info.dart';
 import '../l10n/app_localizations.dart';
@@ -11,12 +10,14 @@ import '../models/subscription.dart';
 import '../services/app_log.dart';
 import '../services/connection.dart';
 import '../services/connection_check.dart';
+import '../services/core_log.dart';
 import '../services/country.dart';
 import '../services/ping.dart';
 import '../services/store.dart';
 import '../services/subscriptions.dart';
 import '../services/theme_controller.dart';
 import '../services/traffic.dart';
+import '../services/update_notifier.dart';
 import '../services/vpn.dart';
 import '../services/xray.dart';
 import '../services/xray_config.dart';
@@ -25,6 +26,7 @@ import '../widgets/add_sheet.dart';
 import '../widgets/common.dart';
 import '../widgets/profile_editor_sheet.dart';
 import '../widgets/provider_card.dart';
+import '../widgets/update_dialog.dart';
 import 'log_screen.dart';
 import 'subscriptions_screen.dart';
 
@@ -41,11 +43,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _coreVersion = '';
   VpnStatus _status = VpnStatus.disconnected;
 
-  DateTime? _connectedAt;
   Timer? _ticker;
   Duration _uptime = Duration.zero;
-  int _checkPort = 0;
-  int _metricsPort = 0;
   bool _checking = false;
   CheckResult? _lastCheck;
 
@@ -54,23 +53,38 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _status = Vpn.status.value;
     Vpn.status.addListener(_onStatus);
+    UpdateNotifier.coreDialog.addListener(_onCoreDialog);
     _loadVersions();
     _syncTimer();
+    // Уведомление могло прийти до монтирования экрана (проверка запускается
+    // сразу после первого кадра приложения) — не теряем его.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onCoreDialog());
   }
 
   @override
   void dispose() {
     Vpn.status.removeListener(_onStatus);
+    UpdateNotifier.coreDialog.removeListener(_onCoreDialog);
     _ticker?.cancel();
     super.dispose();
   }
 
+  void _onCoreDialog() {
+    final notice = UpdateNotifier.coreDialog.value;
+    if (notice == null || !mounted) return;
+    UpdateNotifier.dismissDialog();
+    showUpdateDialog(
+      context,
+      notice.release,
+      coreUpdated: notice.coreUpdated,
+    );
+  }
+
   Future<void> _loadVersions() async {
-    final info = await PackageInfo.fromPlatform();
     final core = Vpn.isSupported ? await const Xray().version() : '';
     if (!mounted) return;
     setState(() {
-      _appVersion = buildStamp.isEmpty ? info.version : buildStamp;
+      _appVersion = buildStamp;
       _coreVersion = core.replaceFirst(
         RegExp(r'^Xray\s+', caseSensitive: false),
         '',
@@ -84,24 +98,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _status = next);
     _syncTimer();
 
-    // Метрики поднимаются ядром уже после события `connecting`. Раньше это
-    // событие останавливало опрос, запущенный сразу после method-channel, и
-    // стрелки навсегда оставались на нуле. Теперь опрос включается на
-    // `connected`, а `connecting` его не сбивает.
-    switch (next) {
-      case VpnStatus.connected:
-        if (_metricsPort > 0) Traffic.start(_metricsPort);
-        break;
-      case VpnStatus.connecting:
-        break;
-      case VpnStatus.disconnected:
-      case VpnStatus.disconnecting:
-      case VpnStatus.error:
-        _metricsPort = 0;
-        Traffic.stop();
-        break;
-    }
-
     if (next == VpnStatus.error) {
       final message = Vpn.lastError.value ?? '';
       AppLog.add('vpn', 'ошибка: $message');
@@ -111,15 +107,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _syncTimer() {
     if (_status == VpnStatus.connected) {
-      _connectedAt ??= DateTime.now();
+      // Время старта приходит из сервиса: после возвращения в приложение
+      // счётчик не должен начинаться заново.
+      final started = Vpn.connectedAt.value ?? DateTime.now();
+      _uptime = DateTime.now().difference(started);
       _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
-        setState(() => _uptime = DateTime.now().difference(_connectedAt!));
+        setState(
+          () => _uptime = DateTime.now().difference(
+            Vpn.connectedAt.value ?? started,
+          ),
+        );
       });
     } else {
       _ticker?.cancel();
       _ticker = null;
-      _connectedAt = null;
       _uptime = Duration.zero;
     }
   }
@@ -158,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_status == VpnStatus.connected) {
-      Traffic.stop();
       await Vpn.disconnect();
       return;
     }
@@ -189,23 +190,23 @@ class _HomeScreenState extends State<HomeScreen> {
         'подключение: ${profile.name} (outbound: ${outbounds.length}, routing: ${base?['routing'] != null})',
       );
       final ports = await const Xray().freePorts(2);
-      _metricsPort = ports.isNotEmpty ? ports[0] : Traffic.defaultPort;
-      _checkPort = ports.length > 1 ? ports[1] : _metricsPort + 1;
+      final metricsPort = ports.isNotEmpty ? ports[0] : Traffic.defaultPort;
+      final checkPort = ports.length > 1 ? ports[1] : metricsPort + 1;
+      // Файл может быть ещё открыт старым ядром: чистим его только на старте
+      // приложения, когда туннель гарантированно не работает.
+      final logPath = await CoreLog.ensurePath();
       _lastCheck = null;
       await Vpn.connect(
         config: buildXrayConfig(
           outbounds: outbounds,
           settings: settings,
           base: base,
-          metricsPort: _metricsPort,
-          checkPort: _checkPort,
+          metricsPort: metricsPort,
+          checkPort: checkPort,
+          logPath: logPath,
         ),
         settings: settings,
       );
-      // Ранний запуск нужен для переподключения без смены статуса: новый порт
-      // отличается от старого, и Traffic.start сам пересоздаст опросчик.
-      // Финальный авторитетный старт делает _onStatus(connected).
-      Traffic.start(_metricsPort);
     } on VpnException catch (e) {
       AppLog.add('vpn', 'ошибка канала: ${e.code} ${e.message}');
       if (mounted) {
@@ -221,6 +222,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _select(Profile profile) async {
+    // Плитки узлов остаются нажимаемыми во время подключения — не даём
+    // вторая команда переподключения встать в очередь к первой.
+    if (_busy) return;
     await Store.instance.update(
       (state) => state.copyWith(selectedId: profile.id),
     );
@@ -252,14 +256,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _check() async {
-    if (_checking || _checkPort == 0) return;
+    final port = Vpn.tunnelProxyPort;
+    if (_checking || port == 0) return;
     final l10n = AppLocalizations.of(context);
     setState(() {
       _checking = true;
       _lastCheck = null;
     });
     try {
-      final result = await const ConnectionCheck().run(_checkPort);
+      final result = await const ConnectionCheck().run(port);
       if (!mounted) return;
       setState(() => _lastCheck = result);
       showMessage(
@@ -379,6 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Center(child: _statusLabel(l10n, theme, selected)),
                 const SizedBox(height: 12),
+                _updateBanner(l10n, theme),
                 if (group.isNotEmpty) ...[
                   Text(
                     l10n.tr('currentProvider').toUpperCase(),
@@ -391,6 +397,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ProviderCard(
                     profiles: group,
                     selectedId: selected?.id,
+                    // Карточка показывает реально настроенный интервал, а не
+                    // рекомендацию панели — как и меню «Подключение».
+                    updateHours: state.settings.subscriptionUpdateHours,
                     subscription: subscription,
                     onSelect: _select,
                     onRefresh: subscription == null
@@ -475,6 +484,36 @@ class _HomeScreenState extends State<HomeScreen> {
     // Выбран узел, добавленный вручную, — показываем их группу, а не подписку.
     if (state.profiles.isNotEmpty) return null;
     return state.subscriptions.isEmpty ? null : state.subscriptions.first;
+  }
+
+  Widget _updateBanner(AppLocalizations l10n, ThemeData theme) {
+    return ValueListenableBuilder<UpdateNotice?>(
+      valueListenable: UpdateNotifier.available,
+      builder: (context, notice, _) {
+        if (notice == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            color: theme.colorScheme.primaryContainer,
+            child: ListTile(
+              leading: const Icon(Icons.system_update_alt_outlined),
+              title: Text(
+                l10n.fmt('updateAvailableBanner', {
+                  'version': notice.release.version,
+                }),
+              ),
+              subtitle: Text(l10n.tr('updateDaily')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showUpdateDialog(
+                context,
+                notice.release,
+                coreUpdated: notice.coreUpdated,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _statusLabel(
@@ -625,16 +664,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 1),
                         ValueListenableBuilder<TrafficSample>(
                           valueListenable: Traffic.speed,
-                          builder: (context, sample, _) => Text(
-                            '↑ ${formatBytes(sample.up)}/s  ↓ ${formatBytes(sample.down)}/s',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                              fontSize: 11,
-                            ),
-                          ),
+                          builder: (context, sample, _) {
+                            // Стрелки убраны: показываем только общую скорость
+                            // и только когда она действительно есть.
+                            if (sample.total <= 0) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Text(
+                                '${l10n.tr('speed')}: '
+                                '${formatBytes(sample.total)}/s',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ],
