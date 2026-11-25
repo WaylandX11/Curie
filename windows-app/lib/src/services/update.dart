@@ -30,8 +30,11 @@ class GithubRelease {
 /// Проверка обновлений без Google Play: смотрим публичные релизы GitHub.
 class GithubUpdate {
   static const String _repo = 'WaylandX11/Curie';
+  // GitHub ставит стабильные релизы выше пре-releases, поэтому берём несколько
+  // и выбираем максимальную версию сами — иначе новая alpha теряется рядом
+  // со старым стабильным APK.
   static const String _api =
-      'https://api.github.com/repos/$_repo/releases?per_page=1';
+      'https://api.github.com/repos/$_repo/releases?per_page=10';
 
   /// Без авторизации. GitHub даёт 60 запросов в час с IP — проверяем не чаще
   /// раза в сутки (и одну проверку по кнопке).
@@ -64,11 +67,30 @@ class GithubUpdate {
         );
       }
       final data = jsonDecode(body) as List<dynamic>;
-      if (data.isEmpty || data.first is! Map) return null;
-      return parseRelease((data.first as Map).cast<String, dynamic>());
+      return latestFrom(data);
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Выбирает самый новый релиз из списка GitHub по номеру версии.
+  ///
+  /// Порядок ответа GitHub не гарантирует, что свежая alpha окажется первой:
+  /// стабильные релизы должны идти раньше пре-releases. Поэтому сравниваем
+  /// версии явно, а не берём `data.first`.
+  static GithubRelease? latestFrom(List<dynamic> data) {
+    final releases = <GithubRelease>[];
+    for (final item in data) {
+      if (item is! Map) continue;
+      releases.add(parseRelease(item.cast<String, dynamic>()));
+    }
+    if (releases.isEmpty) return null;
+
+    var best = releases.first;
+    for (final candidate in releases.skip(1)) {
+      if (isNewer(candidate.version, best.version)) best = candidate;
+    }
+    return best;
   }
 
   /// Разбор ответа отдельно от сети — чтобы можно было покрыть тестами.

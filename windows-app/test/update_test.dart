@@ -70,6 +70,35 @@ void main() {
     expect(GithubUpdate.parseCoreVersion('без версии ядра'), isNull);
   });
 
+  test('newest release wins even when GitHub lists a stable one first', () {
+    final latest = GithubUpdate.latestFrom([
+      {
+        'tag_name': 'v26.11.25.1146',
+        'html_url': 'stable',
+        'assets': [
+          {
+            'name': 'curie-v26.11.25.1146-universal.apk',
+            'browser_download_url': 'old-apk',
+          },
+        ],
+      },
+      {
+        'tag_name': 'v26.11.25.1459-alpha',
+        'html_url': 'alpha',
+        'assets': [
+          {
+            'name': 'Curie-26.11.25.1459-alpha-windows-x64.zip',
+            'browser_download_url': 'new-zip',
+          },
+        ],
+      },
+    ]);
+
+    expect(latest, isNotNull);
+    expect(latest!.version, '26.11.25.1459');
+    expect(latest.downloadUrl, 'new-zip');
+  });
+
   test('core versions are compared by parts', () {
     expect(GithubUpdate.isNewerCore('26.11.10', '26.11.9'), isTrue);
     expect(GithubUpdate.isNewerCore('26.12.1', '26.11.9'), isTrue);
