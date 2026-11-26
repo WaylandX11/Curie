@@ -41,6 +41,7 @@ Future<String?> promptText(
   required String hint,
   String initial = '',
   TextInputType keyboardType = TextInputType.text,
+  bool obscureText = false,
 }) {
   return showDialog<String>(
     context: context,
@@ -49,6 +50,7 @@ Future<String?> promptText(
       hint: hint,
       initial: initial,
       keyboardType: keyboardType,
+      obscureText: obscureText,
     ),
   );
 }
@@ -61,12 +63,14 @@ class _PromptDialog extends StatefulWidget {
     required this.hint,
     required this.initial,
     required this.keyboardType,
+    required this.obscureText,
   });
 
   final String title;
   final String hint;
   final String initial;
   final TextInputType keyboardType;
+  final bool obscureText;
 
   @override
   State<_PromptDialog> createState() => _PromptDialogState();
@@ -74,6 +78,13 @@ class _PromptDialog extends StatefulWidget {
 
 class _PromptDialogState extends State<_PromptDialog> {
   late final TextEditingController _controller = TextEditingController(text: widget.initial);
+  late bool _obscure;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscure = widget.obscureText;
+  }
 
   @override
   void dispose() {
@@ -84,27 +95,46 @@ class _PromptDialogState extends State<_PromptDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final pasteButton = IconButton(
+      tooltip: l10n.tr('paste'),
+      icon: const Icon(Icons.content_paste),
+      onPressed: () async {
+        final text = await clipboardText();
+        if (text != null && mounted) {
+          _controller.text = text;
+          _controller.selection = TextSelection.collapsed(offset: text.length);
+        }
+      },
+    );
     return AlertDialog(
       title: Text(widget.title),
       content: TextField(
         autofocus: true,
         controller: _controller,
         minLines: 1,
-        maxLines: 4,
+        maxLines: widget.obscureText ? 1 : 4,
+        obscureText: _obscure,
         keyboardType: widget.keyboardType,
         decoration: InputDecoration(
           hintText: widget.hint,
-          suffixIcon: IconButton(
-            tooltip: l10n.tr('paste'),
-            icon: const Icon(Icons.content_paste),
-            onPressed: () async {
-              final text = await clipboardText();
-              if (text != null && mounted) {
-                _controller.text = text;
-                _controller.selection = TextSelection.collapsed(offset: text.length);
-              }
-            },
-          ),
+          suffixIcon: widget.obscureText
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: _obscure
+                          ? l10n.tr('showPassword')
+                          : l10n.tr('hidePassword'),
+                      icon: Icon(
+                        _obscure ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscure = !_obscure),
+                    ),
+                    pasteButton,
+                  ],
+                )
+              : pasteButton,
         ),
         onSubmitted: (text) => Navigator.of(context).pop(text),
       ),

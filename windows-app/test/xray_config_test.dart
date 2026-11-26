@@ -29,14 +29,22 @@ void main() {
     expect(inbounds.single['tag'], 'tun');
     // Без имени Xray вызывает net.Interfaces() и падает на Android.
     expect((inbounds.single['settings'] as Map)['name'], isNotEmpty);
-    expect(config.containsKey('env'), isFalse,
-        reason: 'xray.tun.fd подставляет Kotlin, Dart его не знает');
+    expect(
+      config.containsKey('env'),
+      isFalse,
+      reason: 'xray.tun.fd подставляет Kotlin, Dart его не знает',
+    );
   });
 
   test('server outbound comes first, direct and dns-out are appended', () {
-    final outbounds = (build()['outbounds'] as List).cast<Map<String, dynamic>>();
+    final outbounds = (build()['outbounds'] as List)
+        .cast<Map<String, dynamic>>();
 
-    expect(outbounds.map((o) => o['tag']).toList(), ['proxy', 'direct', 'dns-out']);
+    expect(outbounds.map((o) => o['tag']).toList(), [
+      'proxy',
+      'direct',
+      'dns-out',
+    ]);
     expect(outbounds.last['protocol'], 'dns');
   });
 
@@ -57,6 +65,27 @@ void main() {
     expect(json.contains('geosite:'), isFalse);
   });
 
+  test('generated observatory probes the same endpoint as the check', () {
+    const backup = <String, dynamic>{
+      'tag': 'proxy-2',
+      'protocol': 'vless',
+      'settings': {
+        'vnext': [
+          {'address': 'backup.example.com', 'port': 443},
+        ],
+      },
+    };
+    final config = jsonDecode(
+      buildXrayConfig(outbounds: [serverOutbound, backup]),
+    ) as Map<String, dynamic>;
+    final observatory = config['burstObservatory'] as Map<String, dynamic>;
+
+    expect(
+      (observatory['pingConfig'] as Map)['destination'],
+      'https://cp.cloudflare.com/generate_204',
+    );
+  });
+
   test('settings change DNS, MTU and the local-network rule', () {
     final config = buildXrayConfig(
       outbounds: [serverOutbound],
@@ -71,24 +100,41 @@ void main() {
     final inbounds = (json['inbounds'] as List).cast<Map<String, dynamic>>();
     expect((inbounds.single['settings'] as Map)['mtu'], 1400);
 
-    final rules = ((json['routing'] as Map)['rules'] as List).cast<Map<String, dynamic>>();
+    final rules = ((json['routing'] as Map)['rules'] as List)
+        .cast<Map<String, dynamic>>();
     expect(rules.length, 1, reason: 'обход локальной сети выключен');
     expect(rules.single['outboundTag'], 'dns-out');
   });
 
   test('panel routing, balancers and observatory survive TUN rebuild', () {
     final base = {
-      'dns': {'servers': ['1.1.1.1'], 'queryStrategy': 'UseIPv4'},
+      'dns': {
+        'servers': ['1.1.1.1'],
+        'queryStrategy': 'UseIPv4',
+      },
       'routing': {
         'rules': [
-          {'type': 'field', 'domain': ['full:gosuslugi.ru'], 'outboundTag': 'direct'},
-          {'type': 'field', 'network': 'tcp,udp', 'balancerTag': 'Germany_Balancer'},
+          {
+            'type': 'field',
+            'domain': ['full:gosuslugi.ru'],
+            'outboundTag': 'direct',
+          },
+          {
+            'type': 'field',
+            'network': 'tcp,udp',
+            'balancerTag': 'Germany_Balancer',
+          },
         ],
         'balancers': [
-          {'tag': 'Germany_Balancer', 'selector': ['proxy']},
+          {
+            'tag': 'Germany_Balancer',
+            'selector': ['proxy'],
+          },
         ],
       },
-      'burstObservatory': {'subjectSelector': ['proxy']},
+      'burstObservatory': {
+        'subjectSelector': ['proxy'],
+      },
       'inbounds': [
         {'tag': 'socks', 'protocol': 'socks', 'port': 10808},
       ],
@@ -98,28 +144,46 @@ void main() {
       ],
     };
 
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound, {'tag': 'direct', 'protocol': 'freedom'}],
-      base: base,
-    )) as Map<String, dynamic>;
+    final json = jsonDecode(
+      buildXrayConfig(
+        outbounds: [
+          serverOutbound,
+          {'tag': 'direct', 'protocol': 'freedom'},
+        ],
+        base: base,
+      ),
+    ) as Map<String, dynamic>;
 
     expect((json['routing'] as Map)['balancers'], isNotEmpty);
-    final rules = ((json['routing'] as Map)['rules'] as List).cast<Map<String, dynamic>>();
-    expect(rules.length, 3, reason: 'правило DNS добавляется к правилам панели');
+    final rules = ((json['routing'] as Map)['rules'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(
+      rules.length,
+      4,
+      reason:
+          'правило DNS и правило балансировщика добавляются к правилам панели',
+    );
     expect(rules.first['outboundTag'], 'dns-out');
+    expect(rules[1]['inboundTag'], ['curie-dns']);
+    expect(rules[1]['balancerTag'], 'Germany_Balancer');
     expect(rules.last['balancerTag'], 'Germany_Balancer');
     expect(json['burstObservatory'], isNotNull);
-    // Маршрутизацию панели сохраняем; DNS теперь тоже берём из подписки.
-    expect(((json['dns'] as Map)['servers'] as List).first,
-        {'address': '1.1.1.1', 'tag': 'proxy'});
-    expect((json['inbounds'] as List).length, 1, reason: 'socks панели не нужен');
+    // Маршрутизацию панели сохраняем; DNS идёт через её балансировщик.
+    expect(((json['dns'] as Map)['servers'] as List).first, {
+      'address': '1.1.1.1',
+      'tag': 'curie-dns',
+    });
+    expect(
+      (json['inbounds'] as List).length,
+      1,
+      reason: 'socks панели не нужен',
+    );
   });
 
   test('metrics are enabled for the speed indicator', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      metricsPort: 49100,
-    )) as Map<String, dynamic>;
+    final json = jsonDecode(
+      buildXrayConfig(outbounds: [serverOutbound], metricsPort: 49100),
+    ) as Map<String, dynamic>;
 
     expect((json['metrics'] as Map)['listen'], '127.0.0.1:49100');
     expect(json['stats'], isEmpty);
@@ -136,24 +200,32 @@ void main() {
   });
 
   test('the subscription DNS is used by default', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      base: {
-        'dns': {'servers': ['1.1.1.1']},
-      },
-    )) as Map<String, dynamic>;
+    final json = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        base: {
+          'dns': {
+            'servers': ['1.1.1.1'],
+          },
+        },
+      ),
+    ) as Map<String, dynamic>;
     final servers = (json['dns'] as Map)['servers'] as List;
     expect((servers.first as Map)['address'], '1.1.1.1');
   });
 
   test('an explicitly chosen DNS overrides the subscription', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      settings: const Settings(dns: '9.9.9.9', dnsUsePanel: false),
-      base: {
-        'dns': {'servers': ['1.1.1.1']},
-      },
-    )) as Map<String, dynamic>;
+    final json = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        settings: const Settings(dns: '9.9.9.9', dnsUsePanel: false),
+        base: {
+          'dns': {
+            'servers': ['1.1.1.1'],
+          },
+        },
+      ),
+    ) as Map<String, dynamic>;
     final servers = (json['dns'] as Map)['servers'] as List;
     expect((servers.first as Map)['address'], '9.9.9.9');
     expect((servers.first as Map)['tag'], 'proxy');
@@ -179,21 +251,28 @@ void main() {
     expect(sniffing['routeOnly'], isFalse);
   });
 
-  test('DNS can be routed directly when UDP DNS through the proxy is unwanted', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      settings: const Settings(dnsRoute: DnsRoute.direct),
-    )) as Map<String, dynamic>;
-    final servers = (json['dns'] as Map)['servers'] as List;
-    expect((servers.first as Map)['tag'], 'direct');
-  });
+  test(
+    'DNS can be routed directly when UDP DNS through the proxy is unwanted',
+    () {
+      final json = jsonDecode(
+        buildXrayConfig(
+          outbounds: [serverOutbound],
+          settings: const Settings(dnsRoute: DnsRoute.direct),
+        ),
+      ) as Map<String, dynamic>;
+      final servers = (json['dns'] as Map)['servers'] as List;
+      expect((servers.first as Map)['tag'], 'direct');
+    },
+  );
 
   test('local check proxy is routed through the server outbounds', () {
-    final json = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      metricsPort: 49100,
-      checkPort: 49101,
-    )) as Map<String, dynamic>;
+    final json = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        metricsPort: 49100,
+        checkPort: 49101,
+      ),
+    ) as Map<String, dynamic>;
     final inbounds = (json['inbounds'] as List).cast<Map<String, dynamic>>();
     expect(inbounds.length, 2);
     final check = inbounds.last;
@@ -225,76 +304,104 @@ void main() {
     },
   };
 
-  test('a config with a fallback host gets an auto balancer with fallbackTag',
-      () {
-    final config = jsonDecode(buildXrayConfig(
-      outbounds: [fallbackOutbound, primaryOutbound],
-      base: {
-        'remarks': 'Обход БС',
-        'burstObservatory': {'subjectSelector': ['proxy']},
-      },
-      checkPort: 49101,
-    )) as Map<String, dynamic>;
+  test(
+    'a config with a fallback host gets an auto balancer with fallbackTag',
+    () {
+      final config = jsonDecode(
+        buildXrayConfig(
+          outbounds: [fallbackOutbound, primaryOutbound],
+          base: {
+            'remarks': 'Обход БС',
+            'burstObservatory': {
+              'subjectSelector': ['proxy'],
+            },
+          },
+          checkPort: 49101,
+        ),
+      ) as Map<String, dynamic>;
 
-    final routing = config['routing'] as Map<String, dynamic>;
-    final balancers = (routing['balancers'] as List).cast<Map<String, dynamic>>();
-    expect(balancers.single['selector'], ['proxy-2']);
-    expect(balancers.single['fallbackTag'], 'proxy');
+      final routing = config['routing'] as Map<String, dynamic>;
+      final balancers = (routing['balancers'] as List)
+          .cast<Map<String, dynamic>>();
+      expect(balancers.single['selector'], ['proxy-2']);
+      expect(balancers.single['fallbackTag'], 'proxy');
 
-    final rules = (routing['rules'] as List).cast<Map<String, dynamic>>();
-    expect(rules.last['balancerTag'], 'curie-auto-balancer');
-    expect(rules.first['outboundTag'], 'proxy-2',
-        reason: 'проверка и DNS идут через рабочий сервер, не через fallback');
-    final dnsServers =
-        ((config['dns'] as Map)['servers'] as List).cast<Map<String, dynamic>>();
-    expect(dnsServers.first['tag'], 'proxy-2');
-    expect(config['burstObservatory'], isNotNull);
-  });
+      final rules = (routing['rules'] as List).cast<Map<String, dynamic>>();
+      expect(rules.last['balancerTag'], 'curie-auto-balancer');
+      // Проверка и DNS идут через балансировщик: при отказе основного узла
+      // запасной продолжает работать, а не ждёт перезапуска ядра.
+      expect(rules.first['inboundTag'], ['check']);
+      expect(rules.first['balancerTag'], 'curie-auto-balancer');
+      expect(rules.first.containsKey('outboundTag'), isFalse);
+      final dnsRules = rules
+          .where(
+            (rule) =>
+                (rule['inboundTag'] as List?)?.contains('curie-dns') == true,
+          )
+          .toList();
+      expect(dnsRules.single['balancerTag'], 'curie-auto-balancer');
+      final dnsServers = ((config['dns'] as Map)['servers'] as List)
+          .cast<Map<String, dynamic>>();
+      expect(dnsServers.first['tag'], 'curie-dns');
+      expect((config['dns'] as Map)['tag'], 'curie-dns');
+      expect(config['burstObservatory'], isNotNull);
+    },
+  );
 
   test('a panel balancer without fallbackTag gets one', () {
-    final config = jsonDecode(buildXrayConfig(
-      outbounds: [fallbackOutbound, primaryOutbound],
-      base: {
-        'routing': {
-          'rules': [
-            {'type': 'field', 'network': 'tcp,udp', 'balancerTag': 'balance'},
-          ],
-          'balancers': [
-            {'tag': 'balance', 'selector': ['proxy-']},
-          ],
+    final config = jsonDecode(
+      buildXrayConfig(
+        outbounds: [fallbackOutbound, primaryOutbound],
+        base: {
+          'routing': {
+            'rules': [
+              {'type': 'field', 'network': 'tcp,udp', 'balancerTag': 'balance'},
+            ],
+            'balancers': [
+              {
+                'tag': 'balance',
+                'selector': ['proxy-'],
+              },
+            ],
+          },
+          'burstObservatory': {
+            'subjectSelector': ['proxy'],
+          },
         },
-        'burstObservatory': {'subjectSelector': ['proxy']},
-      },
-    )) as Map<String, dynamic>;
+      ),
+    ) as Map<String, dynamic>;
 
     final routing = config['routing'] as Map<String, dynamic>;
-    final balancers = (routing['balancers'] as List).cast<Map<String, dynamic>>();
+    final balancers = (routing['balancers'] as List)
+        .cast<Map<String, dynamic>>();
     expect(balancers.single['fallbackTag'], 'proxy');
     expect(
       (routing['rules'] as List).whereType<Map>().any(
-            (rule) => rule['balancerTag'] == 'curie-auto-balancer',
-          ),
+        (rule) => rule['balancerTag'] == 'curie-auto-balancer',
+      ),
       isFalse,
       reason: 'панельный балансировщик уже подключён правилом',
     );
   });
 
   test('explicit panel domainStrategy is never overridden', () {
-    final config = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      base: {
-        'routing': {
-          'domainStrategy': 'IpOnDemand',
-          'rules': [
-            {
-              'type': 'field',
-              'ip': ['1.2.3.0/24'],
-              'outboundTag': 'direct',
-            },
-          ],
+    final config = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        base: {
+          'routing': {
+            'domainStrategy': 'IpOnDemand',
+            'rules': [
+              {
+                'type': 'field',
+                'ip': ['1.2.3.0/24'],
+                'outboundTag': 'direct',
+              },
+            ],
+          },
         },
-      },
-    )) as Map<String, dynamic>;
+      ),
+    ) as Map<String, dynamic>;
     expect((config['routing'] as Map)['domainStrategy'], 'IpOnDemand');
   });
 
@@ -320,27 +427,32 @@ void main() {
           },
         ],
       },
-      'burstObservatory': {'subjectSelector': ['proxy']},
+      'burstObservatory': {
+        'subjectSelector': ['proxy'],
+      },
     };
 
-    final config = jsonDecode(buildXrayConfig(
-      outbounds: [
-        fallbackOutbound,
-        primaryOutbound,
-        const {'tag': 'direct', 'protocol': 'freedom'},
-        const {'tag': 'block', 'protocol': 'blackhole'},
-      ],
-      base: base,
-      checkPort: 49101,
-    )) as Map<String, dynamic>;
+    final config = jsonDecode(
+      buildXrayConfig(
+        outbounds: [
+          fallbackOutbound,
+          primaryOutbound,
+          const {'tag': 'direct', 'protocol': 'freedom'},
+          const {'tag': 'block', 'protocol': 'blackhole'},
+        ],
+        base: base,
+        checkPort: 49101,
+      ),
+    ) as Map<String, dynamic>;
 
     final routing = config['routing'] as Map<String, dynamic>;
     // Без IpIfNonMatch IP-правила не проверялись бы для доменных соединений.
     expect(routing['domainStrategy'], 'IpIfNonMatch');
 
     final rules = (routing['rules'] as List).cast<Map<String, dynamic>>();
-    final directRules =
-        rules.where((rule) => rule['outboundTag'] == 'direct').toList();
+    final directRules = rules
+        .where((rule) => rule['outboundTag'] == 'direct')
+        .toList();
     expect(directRules, hasLength(2));
     expect(directRules.first['domain'], [
       r'regexp:.*\.ru$',
@@ -349,24 +461,35 @@ void main() {
     ]);
     expect(directRules.last['ip'], ['84.201.173.203/32', '77.88.8.8/32']);
 
-    final balancerIndex =
-        rules.indexWhere((rule) => rule['balancerTag'] == 'curie-auto-balancer');
-    final lastDirect =
-        rules.lastIndexWhere((rule) => rule['outboundTag'] == 'direct');
-    expect(balancerIndex, greaterThan(-1));
-    expect(lastDirect, lessThan(balancerIndex),
-        reason: 'catch-all балансировщик не должен перехватывать белые списки');
+    final balancerRules = rules
+        .where((rule) => rule['balancerTag'] == 'curie-auto-balancer')
+        .toList();
+    expect(
+      balancerRules,
+      hasLength(3),
+      reason: 'проверка, DNS и catch-all идут через один балансировщик',
+    );
+    final catchAllIndex = rules.lastIndexOf(balancerRules.last);
+    final lastDirect = rules.lastIndexWhere(
+      (rule) => rule['outboundTag'] == 'direct',
+    );
+    expect(
+      lastDirect,
+      lessThan(catchAllIndex),
+      reason: 'catch-all балансировщик не должен перехватывать белые списки',
+    );
 
-    final balancers = (routing['balancers'] as List).cast<Map<String, dynamic>>();
+    final balancers = (routing['balancers'] as List)
+        .cast<Map<String, dynamic>>();
     expect(balancers.single['selector'], ['proxy-2']);
     expect(balancers.single['fallbackTag'], 'proxy');
     expect((balancers.single['strategy'] as Map)['settings'], isEmpty);
 
     final tun = (config['inbounds'] as List).first;
     expect((tun['sniffing'] as Map)['routeOnly'], isFalse);
-    final dnsServers =
-        ((config['dns'] as Map)['servers'] as List).cast<Map<String, dynamic>>();
-    expect(dnsServers.first['tag'], 'proxy-2');
+    final dnsServers = ((config['dns'] as Map)['servers'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(dnsServers.first['tag'], 'curie-dns');
     expect(
       (config['outbounds'] as List).map((o) => o['tag']),
       contains('direct'),
@@ -375,14 +498,16 @@ void main() {
 
   test('Xray logs use logLevel and a masked private file', () {
     const path = '/data/user/0/io.github.waylandx11.curie/files/curie-xray.log';
-    final config = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      settings: const Settings(
-        xrayLogEnabled: true,
-        xrayLogLevel: XrayLogLevel.debug,
+    final config = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        settings: const Settings(
+          xrayLogEnabled: true,
+          xrayLogLevel: XrayLogLevel.debug,
+        ),
+        logPath: path,
       ),
-      logPath: path,
-    )) as Map<String, dynamic>;
+    ) as Map<String, dynamic>;
     final log = (config['log'] as Map).cast<String, dynamic>();
 
     expect(log['logLevel'], 'debug', reason: 'Xray ignores lowercase loglevel');
@@ -396,17 +521,19 @@ void main() {
   });
 
   test('disabled or pathless logging writes nothing', () {
-    final disabled = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-      settings: const Settings(xrayLogEnabled: false),
-      logPath: '/some/path',
-    )) as Map<String, dynamic>;
+    final disabled = jsonDecode(
+      buildXrayConfig(
+        outbounds: [serverOutbound],
+        settings: const Settings(xrayLogEnabled: false),
+        logPath: '/some/path',
+      ),
+    ) as Map<String, dynamic>;
     expect((disabled['log'] as Map)['logLevel'], 'none');
     expect((disabled['log'] as Map)['error'], 'none');
 
-    final noPath = jsonDecode(buildXrayConfig(
-      outbounds: [serverOutbound],
-    )) as Map<String, dynamic>;
+    final noPath = jsonDecode(
+      buildXrayConfig(outbounds: [serverOutbound]),
+    ) as Map<String, dynamic>;
     expect((noPath['log'] as Map)['error'], 'none');
   });
 }

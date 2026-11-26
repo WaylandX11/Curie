@@ -27,12 +27,15 @@ class Vpn {
   static final ValueNotifier<int> metricsPort = ValueNotifier(0);
   static final ValueNotifier<DateTime?> connectedAt = ValueNotifier(null);
 
+  /// true, пока активный туннель держит Rust-ядро. Выставляется из статуса
+  /// нативного слоя, поэтому переживает пересоздание Flutter-движка.
+  static bool isRustActive = false;
+
   static bool get isSupported => Platform.isAndroid;
 
   /// Порт для обновлений: 0, когда туннель не работает.
-  static int get tunnelProxyPort => status.value == VpnStatus.connected
-      ? outboundProxyPort.value
-      : 0;
+  static int get tunnelProxyPort =>
+      status.value == VpnStatus.connected ? outboundProxyPort.value : 0;
 
   static Future<void>? _ready;
 
@@ -74,8 +77,11 @@ class Vpn {
 
     // Сначала порты и время старта, затем статус: слушатели статуса
     // (TunnelMonitor и экран) должны сразу видеть готовую сессию.
-    outboundProxyPort.value = active ? (args['check'] as num?)?.toInt() ?? 0 : 0;
+    outboundProxyPort.value = active
+        ? (args['check'] as num?)?.toInt() ?? 0
+        : 0;
     metricsPort.value = active ? (args['metrics'] as num?)?.toInt() ?? 0 : 0;
+    isRustActive = args['core'] == 'rust';
     connectedAt.value = active && started != null && started > 0
         ? DateTime.fromMillisecondsSinceEpoch(started)
         : null;
@@ -86,30 +92,48 @@ class Vpn {
   static Future<void> connect({
     required String config,
     required Settings settings,
+    String geoDir = '',
   }) async {
     try {
       await _channel.invokeMethod<void>('connect', {
         'config': config,
+        'tunnelMode': settings.tunnelMode.wireName,
+        'useRustCore': settings.useRustCore,
         'dns': settings.dns,
         'mtu': settings.mtu,
         'mode': settings.routingMode.wireName,
         'allowed': settings.allowedApps,
         'bypassed': settings.bypassedApps,
+        'geoDir': geoDir,
       });
     } on PlatformException catch (e) {
       throw VpnException(e.code, e.message ?? e.code);
     }
   }
 
+  /// Накопительные счётчики Rust-ядра; null, когда туннель не на нём.
+  static Future<({int up, int down})?> rustTraffic() async {
+    try {
+      final raw = await _channel.invokeMapMethod<String, num>('rustTraffic');
+      if (raw == null) return null;
+      return (
+        up: (raw['up'] ?? 0).toInt(),
+        down: (raw['down'] ?? 0).toInt(),
+      );
+    } on Object {
+      return null;
+    }
+  }
+
   static Future<void> disconnect() => _channel.invokeMethod<void>('disconnect');
 
   static VpnStatus _statusFromName(String? name) => switch (name) {
-        'connecting' => VpnStatus.connecting,
-        'connected' => VpnStatus.connected,
-        'disconnecting' => VpnStatus.disconnecting,
-        'error' => VpnStatus.error,
-        _ => VpnStatus.disconnected,
-      };
+    'connecting' => VpnStatus.connecting,
+    'connected' => VpnStatus.connected,
+    'disconnecting' => VpnStatus.disconnecting,
+    'error' => VpnStatus.error,
+    _ => VpnStatus.disconnected,
+  };
 }
 
 class VpnException implements Exception {

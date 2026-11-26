@@ -2,6 +2,7 @@ package io.github.waylandx11.curie
 
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import io.flutter.plugin.common.MethodChannel
 
@@ -35,13 +36,29 @@ object CurieBridge {
     @Volatile
     private var checkPort: Int = 0
 
+    // Какое ядро держит активный туннель. Dart использует это, чтобы выбрать
+    // источник версии и счётчиков трафика после пересоздания движка.
+    @Volatile
+    private var coreName: String = "xray"
+
     @Volatile
     private var connectedAtMs: Long = 0
 
     private val main = Handler(Looper.getMainLooper())
 
+    // Меняется только при реальной смерти процесса. Пересоздание Flutter-движка
+    // внутри живого процесса оставляет токен прежним — по этому признаку Dart
+    // отличает «запуск Curie» от простого возврата в интерфейс.
+    private val processStartRealtimeMs = SystemClock.elapsedRealtime()
+
+    fun processToken(): String = "${Process.myPid()}-$processStartRealtimeMs"
+
     fun attach(channel: MethodChannel) {
         this.channel = channel
+    }
+
+    fun setCore(name: String) {
+        coreName = name
     }
 
     fun setSession(metricsPort: Int, checkPort: Int) {
@@ -59,7 +76,8 @@ object CurieBridge {
     fun session(): Map<String, Any?> = mapOf(
         "metrics" to metricsPort,
         "check" to checkPort,
-        "connectedAt" to connectedAtMs
+        "connectedAt" to connectedAtMs,
+        "core" to coreName
     )
 
     fun emit(status: String, error: String? = null) {

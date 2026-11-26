@@ -1,12 +1,13 @@
 name: curie_windows
 description: "Curie — Xray client for Windows."
 publish_to: 'none'
-version: 26.11.25+3629519
+version: 26.11.26+3630909
 
 environment:
   sdk: ^3.14.0
 
 dependencies:
+  crypto: ^3.0.6
   cryptography: ^2.9.0
   cupertino_icons: ^2.0.0
   flutter:

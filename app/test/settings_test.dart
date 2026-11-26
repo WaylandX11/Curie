@@ -13,6 +13,17 @@ void main() {
     expect(RoutingMode.fromName(null), RoutingMode.all);
   });
 
+  test('experimental Rust core is off by default and survives a round trip', () {
+    expect(const Settings().useRustCore, isFalse);
+    expect(Settings.fromJson({'tunnelMode': 'tun'}).useRustCore, isFalse);
+
+    const enabled = Settings(tunnelMode: TunnelMode.tunProxy, useRustCore: true);
+    final restored = Settings.fromJson(enabled.toJson());
+    expect(restored.useRustCore, isTrue);
+    expect(restored.tunnelMode, TunnelMode.tunProxy);
+    expect(restored.copyWith(useRustCore: false).useRustCore, isFalse);
+  });
+
   test('DNS comes from the subscription by default', () {
     const settings = Settings();
     expect(settings.dnsUsePanel, isTrue);

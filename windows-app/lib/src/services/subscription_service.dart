@@ -4,6 +4,7 @@ import 'dart:io';
 import '../models/profile.dart';
 import '../models/subscription.dart';
 import 'app_log.dart';
+import 'geo_assets.dart';
 import 'subscription_parser.dart';
 import 'xray.dart';
 
@@ -52,10 +53,7 @@ class SubscriptionService {
   }) async {
     final baseUri = Uri.parse(subscription.url);
     final jsonUri = requestUri(subscription.url);
-    final candidates = <Uri>[
-      if (jsonUri != baseUri) jsonUri,
-      baseUri,
-    ];
+    final candidates = <Uri>[if (jsonUri != baseUri) jsonUri, baseUri];
 
     _Fetched? fetched;
     List<Profile>? nodes;
@@ -70,13 +68,20 @@ class SubscriptionService {
           userAgent: userAgent,
           proxyPort: proxyPort,
         );
-        final parsed = await _nodes(result.body, result.contentType, subscription.url);
+        final parsed = await _nodes(
+          result.body,
+          result.contentType,
+          subscription.url,
+        );
         if (parsed.isEmpty) throw const SubscriptionException('noNodes');
 
         // `/json` проигнорирован панелью и вернул ссылки: есть шанс, что
         // базовый URL отдаст JSON (например, по правилу в панели).
         if (i == 0 && parsed.first.isJson == false && candidates.length > 1) {
-          failure ??= const SubscriptionException('links', 'json suffix ignored');
+          failure ??= const SubscriptionException(
+            'links',
+            'json suffix ignored',
+          );
           continue;
         }
 
@@ -98,24 +103,34 @@ class SubscriptionService {
     // Ручные правки узлов переживают обновление подписки.
     nodes = nodes.map(subscription.applyEdit).toList();
 
-    AppLog.add('subscription',
-        '${subscription.url}: ${nodes.length} узлов (${nodes.first.isJson ? 'JSON' : 'ссылки'}${viaSuffix ? ', /json' : ''})');
+    AppLog.add(
+      'subscription',
+      '${subscription.url}: ${nodes.length} узлов (${nodes.first.isJson ? 'JSON' : 'ссылки'}${viaSuffix ? ', /json' : ''})',
+    );
 
-    final title = SubscriptionParser.decodeHeader(fetched.header('profile-title')) ??
+    final title =
+        SubscriptionParser.decodeHeader(fetched.header('profile-title')) ??
         subscription.title.ifEmpty(_hostOf(subscription.url));
-    final interval = int.tryParse(fetched.header('profile-update-interval') ?? '') ?? 0;
+    final interval =
+        int.tryParse(fetched.header('profile-update-interval') ?? '') ?? 0;
 
     return subscription.copyWith(
       title: title,
       nodes: nodes,
       updatedAt: DateTime.now(),
-      updateIntervalHours: interval > 0 ? interval : subscription.updateIntervalHours,
-      info: SubscriptionInfo.parse(fetched.header('subscription-userinfo')) ??
+      updateIntervalHours: interval > 0
+          ? interval
+          : subscription.updateIntervalHours,
+      info:
+          SubscriptionInfo.parse(fetched.header('subscription-userinfo')) ??
           subscription.info,
-      announce: SubscriptionParser.decodeHeader(fetched.header('announce')) ??
+      announce:
+          SubscriptionParser.decodeHeader(fetched.header('announce')) ??
           subscription.announce,
       supportUrl: fetched.header('support-url') ?? subscription.supportUrl,
-      webPageUrl: fetched.header('profile-web-page-url') ?? subscription.webPageUrl,
+      webPageUrl:
+          fetched.header('profile-web-page-url') ?? subscription.webPageUrl,
+      requiresGeoAssets: GeoAssets.containsGeoRules(fetched.body),
       clearError: true,
     );
   }
@@ -130,9 +145,8 @@ class SubscriptionService {
       ..connectionTimeout = const Duration(seconds: 15)
       // Curie исключён из собственного TUN. Когда туннель поднят, панель
       // обновляем через локальный HTTP-прокси Xray; иначе — напрямую.
-      ..findProxy = (_) => proxyPort > 0
-          ? 'PROXY 127.0.0.1:$proxyPort'
-          : 'DIRECT';
+      ..findProxy = (_) =>
+          proxyPort > 0 ? 'PROXY 127.0.0.1:$proxyPort' : 'DIRECT';
     try {
       final request = await client.getUrl(uri);
       request.headers.set(HttpHeaders.userAgentHeader, userAgent);
@@ -149,27 +163,37 @@ class SubscriptionService {
       final response = await request.close().timeout(_timeout);
 
       if (response.statusCode != HttpStatus.ok) {
-        if (response.statusCode == HttpStatus.notFound && !headers.containsKey('x-hwid')) {
+        if (response.statusCode == HttpStatus.notFound &&
+            !headers.containsKey('x-hwid')) {
           throw const SubscriptionException('hwidRequired');
         }
         throw SubscriptionException('http', '${response.statusCode}');
       }
 
-      if (_flag(response, 'x-hwid-max-devices-reached') || _flag(response, 'x-hwid-limit')) {
+      if (_flag(response, 'x-hwid-max-devices-reached') ||
+          _flag(response, 'x-hwid-limit')) {
         throw const SubscriptionException('hwidLimit');
       }
       if (_flag(response, 'x-hwid-not-supported')) {
         throw const SubscriptionException('hwidRequired');
       }
 
-      final body = await response.transform(utf8.decoder).join().timeout(_timeout);
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(_timeout);
       // Копируем заголовки: клиент закрывается в finally, а meta-заголовки
       // панели нужны уже после его закрытия.
       final responseHeaders = <String, String>{};
       response.headers.forEach(
-        (name, values) => responseHeaders[name.toLowerCase()] = values.join(', '),
+        (name, values) =>
+            responseHeaders[name.toLowerCase()] = values.join(', '),
       );
-      return _Fetched(body, response.headers.contentType?.mimeType ?? '', responseHeaders);
+      return _Fetched(
+        body,
+        response.headers.contentType?.mimeType ?? '',
+        responseHeaders,
+      );
     } on SubscriptionException {
       rethrow;
     } on Object catch (e) {
@@ -179,9 +203,14 @@ class SubscriptionService {
     }
   }
 
-  Future<List<Profile>> _nodes(String body, String contentType, String url) async {
+  Future<List<Profile>> _nodes(
+    String body,
+    String contentType,
+    String url,
+  ) async {
     // 1. JSON — приоритет, даже если content-type врёт.
-    if (contentType.contains('json') || SubscriptionParser.looksLikeJson(body)) {
+    if (contentType.contains('json') ||
+        SubscriptionParser.looksLikeJson(body)) {
       final parsed = SubscriptionParser.parseJson(body, subscriptionUrl: url);
       if (parsed.isNotEmpty) return parsed;
     }
@@ -194,12 +223,14 @@ class SubscriptionService {
     for (final link in links) {
       try {
         final outbounds = await xray.parseLink(link);
-        nodes.add(profileFromOutbound(
-          link: link,
-          outbound: outbounds.first,
-          fallbackName: _nameFromLink(link) ?? 'Node ${nodes.length + 1}',
-          subscriptionUrl: url,
-        ));
+        nodes.add(
+          profileFromOutbound(
+            link: link,
+            outbound: outbounds.first,
+            fallbackName: _nameFromLink(link) ?? 'Node ${nodes.length + 1}',
+            subscriptionUrl: url,
+          ),
+        );
       } on Object {
         // Битый узел не должен ронять всю подписку.
       }
@@ -211,7 +242,8 @@ class SubscriptionService {
       response.headers.value(name)?.toLowerCase() == 'true';
 
   /// Оставлено для совместимости с тестами и внешними вызовами.
-  static List<String> extractLinks(String body) => SubscriptionParser.extractLinks(body);
+  static List<String> extractLinks(String body) =>
+      SubscriptionParser.extractLinks(body);
 
   static String _hostOf(String url) => Uri.tryParse(url)?.host ?? url;
 

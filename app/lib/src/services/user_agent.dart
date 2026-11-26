@@ -3,6 +3,7 @@ import 'dart:io';
 import '../generated/build_info.dart';
 import '../generated/core_info.dart';
 import 'app_log.dart';
+import 'core.dart';
 import 'platform_info.dart';
 import 'xray.dart';
 
@@ -20,8 +21,10 @@ String formatUserAgent({
       .replaceAll(RegExp(r'\s+'), '');
   // И версия ядра из libXray, и ответ xrayVersion могут прийти с префиксом v.
   // В заголовке оставляем только цифры: Curie/…/26.11.9/…, а не /v26.11.9/…
-  final xray = (core.isEmpty ? libXrayVersion : core)
-      .replaceFirst(RegExp(r'^v(?=\d)', caseSensitive: false), '');
+  final xray = (core.isEmpty ? libXrayVersion : core).replaceFirst(
+    RegExp(r'^v(?=\d)', caseSensitive: false),
+    '',
+  );
   final os = (platform ?? Platform.operatingSystem).trim();
   return ['Curie', app, xray, os].where((part) => part.isNotEmpty).join('/');
 }
@@ -32,20 +35,29 @@ String formatUserAgent({
 Future<String> currentUserAgent({
   Xray xray = const Xray(),
   Future<String> Function()? platformPart,
+  Future<String> Function()? coreVersionPart,
 }) async {
   final os = platformPart != null
       ? await platformPart()
       : await PlatformInfo.userAgentPart();
+  final version = coreVersionPart != null
+      ? await coreVersionPart()
+      : rustCoreEnabled
+      ? await rustCoreVersion()
+      : await xray.version();
   final header = formatUserAgent(
     appVersion: buildStamp,
-    xrayVersion: await xray.version(),
+    xrayVersion: version,
     platform: os,
   );
-  if (!_logged) {
-    _logged = true;
+  // Заголовок пишется один раз для каждого значения: после обновления ядра
+  // версия меняется, и новый заголовок тоже должен появиться в журнале.
+  if (_loggedHeader != header &&
+      !AppLog.contains('app', 'User-Agent: $header')) {
+    _loggedHeader = header;
     AppLog.add('app', 'User-Agent: $header');
   }
   return header;
 }
 
-bool _logged = false;
+String? _loggedHeader;

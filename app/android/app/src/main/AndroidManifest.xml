@@ -59,6 +59,21 @@
             </intent-filter>
         </service>
 
+        <!-- Экспериментальный туннель на xray-rust-mobile. Активируется только
+             переключателем «Экспериментальное»; по умолчанию не используется. -->
+        <service
+            android:name=".CurieRustVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="vpn" />
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
         <!-- Замер через узел (libXray pingBatch) в отдельном процессе: основной
              процесс уже держит runXray, а libXray запрещает pingBatch рядом с ним. -->
         <service

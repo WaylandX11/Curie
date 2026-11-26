@@ -73,7 +73,7 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 #endif
 
 // Полная Windows-версия YY.MM.DD.HHMM-alpha. Обновляется scripts\set-version.ps1.
-#define CURIE_VERSION_STRING "26.11.25.1459-alpha"
+#define CURIE_VERSION_STRING "26.11.26.1409-alpha"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION VERSION_AS_NUMBER

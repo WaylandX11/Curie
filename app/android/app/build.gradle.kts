@@ -54,6 +54,19 @@ android {
         checkReleaseBuilds = false
         abortOnError = false
     }
+
+    // Один universal APK и три лёгких варианта под конкретные ABI.
+    // 32-битный x86 убран: Flutter 3.50 больше не поставляет для него
+    // libflutter.so/gen_snapshot, хотя AAR xray-rust-mobile всё ещё содержит
+    // libxray_ffi.so. Такой APK не смог бы запустить приложение.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
+    }
 }
 
 kotlin {
@@ -65,6 +78,9 @@ kotlin {
 dependencies {
     // Ядро Xray: официальная обёртка XTLS (MIT). Кладёт scripts/sync-core.ps1.
     implementation(files("libs/libXray.aar"))
+    // Экспериментальное Rust-ядро (MPL-2.0), выключаемое в интерфейсе.
+    // Обычный путь по умолчанию остаётся на libXray.
+    implementation("io.github.aimalygin:xray-rust-mobile:0.10.1")
 }
 
 flutter {

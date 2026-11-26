@@ -16,6 +16,7 @@ import 'src/version.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final freshStart = await AppLog.init();
   await Store.instance.load();
   await LocaleController.load();
   await ThemeController.load();
@@ -24,7 +25,9 @@ Future<void> main() async {
   TunnelMonitor.start();
   // Версия берётся из одного источника — build_info, который пишет set-version.ps1.
   // Так журнал всегда показывает ту же сборку, что и экран «О приложении».
-  AppLog.add('app', 'запуск Curie $displayVersion, ядро $libXrayVersion');
+  if (freshStart) {
+    AppLog.add('app', 'запуск Curie $displayVersion, ядро $libXrayVersion');
+  }
   // Точный заголовок виден в журнале сразу после запуска — так про проверить,
   // что панель получает версию ОС, а не просто «android».
   unawaited(currentUserAgent());

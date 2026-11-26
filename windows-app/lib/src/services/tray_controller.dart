@@ -9,6 +9,7 @@ import '../models/profile.dart';
 import 'app_log.dart';
 import 'connection.dart';
 import 'core_log.dart';
+import 'geo_assets.dart';
 import 'store.dart';
 import 'system_locale.dart';
 import 'traffic.dart';
@@ -94,8 +95,8 @@ class CurieTray {
       if (menu == null) return;
 
       final status = Vpn.status.value;
-      final busy = status == VpnStatus.connecting ||
-          status == VpnStatus.disconnecting;
+      final busy =
+          status == VpnStatus.connecting || status == VpnStatus.disconnecting;
       final toggleLabel = status == VpnStatus.connected
           ? _tr('disconnect')
           : _tr('connect');
@@ -242,6 +243,7 @@ class CurieTray {
       final metricsPort = ports.isNotEmpty ? ports[0] : Traffic.defaultPort;
       final checkPort = ports.length > 1 ? ports[1] : metricsPort + 1;
       final logPath = await CoreLog.ensurePath();
+      final geoAssetDir = await GeoAssets.assetDirectory();
       AppLog.add('tray', 'подключение: ${profile.name}');
       await Vpn.connect(
         config: buildXrayConfig(
@@ -251,6 +253,7 @@ class CurieTray {
           metricsPort: metricsPort,
           checkPort: checkPort,
           logPath: logPath,
+          geoAssetDir: geoAssetDir,
         ),
         settings: settings,
       );

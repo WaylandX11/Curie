@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'app_log.dart';
 import 'core_log.dart';
+import 'geo_assets.dart';
 import 'store.dart';
 import 'subscriptions.dart';
 import 'update_checker.dart';
@@ -27,20 +28,23 @@ class CurieSchedulers {
     _started = true;
     UpdateChecker.restorePending();
     await _pruneCoreLogIfIdle();
+    await GeoAssets.refreshStatus();
+    unawaited(GeoAssets.noticeStoredSubscriptions());
 
     // Первый проход после первого кадра: сеть не должна задерживать запуск UI.
     Timer(const Duration(seconds: 2), () {
       unawaited(checkSubscriptions());
       unawaited(checkUpdates());
+      unawaited(GeoAssets.maybeAutoUpdate());
     });
     _subscriptionTimer ??= Timer.periodic(
       _subscriptionCadence,
       (_) => unawaited(checkSubscriptions()),
     );
-    _updateTimer ??= Timer.periodic(
-      _updateCadence,
-      (_) => unawaited(checkUpdates()),
-    );
+    _updateTimer ??= Timer.periodic(_updateCadence, (_) {
+      unawaited(checkUpdates());
+      unawaited(GeoAssets.maybeAutoUpdate());
+    });
   }
 
   /// Сразу после foreground: догоняем то, что прошло, пока приложение было в фоне.
@@ -48,7 +52,11 @@ class CurieSchedulers {
     if (!_started) return;
     await Vpn.refresh();
     await _pruneCoreLogIfIdle();
-    await Future.wait([checkSubscriptions(), checkUpdates()]);
+    await Future.wait([
+      checkSubscriptions(),
+      checkUpdates(),
+      GeoAssets.maybeAutoUpdate(),
+    ]);
   }
 
   /// Перезаписывать журнал можно только когда ядро не держит файл открытым.
@@ -72,7 +80,9 @@ class CurieSchedulers {
       final settings = Store.instance.state.value.settings;
       if (!force && !settings.autoUpdateSubscriptions) return;
       final due = Store.instance.state.value.subscriptions
-          .where((s) => s.isStale(overrideHours: settings.subscriptionUpdateHours))
+          .where(
+            (s) => s.isStale(overrideHours: settings.subscriptionUpdateHours),
+          )
           .length;
       if (due == 0) return;
       AppLog.add(

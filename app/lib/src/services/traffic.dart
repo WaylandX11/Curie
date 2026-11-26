@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'vpn.dart';
+
 /// Скорость в байтах в секунду.
 class TrafficSample {
   const TrafficSample({this.up = 0, this.down = 0});
@@ -68,6 +70,7 @@ class Traffic extends ValueNotifier<TrafficSample> {
   DateTime? _lastAt;
 
   static void start(int port) => instance._start(port);
+
   static void stop() => instance._stop();
 
   void _start(int port) {
@@ -94,6 +97,17 @@ class Traffic extends ValueNotifier<TrafficSample> {
   }
 
   Future<void> _poll() async {
+    // Экспериментальное Rust-ядро не поднимает HTTP-метрики: его счётчики
+    // приходят через MethodChannel из XrayVpnRuntimeSnapshot.
+    if (Vpn.isRustActive) {
+      final raw = await Vpn.rustTraffic();
+      if (raw == null) {
+        _resetSample();
+      } else {
+        _applySample(TrafficSample(up: raw.up, down: raw.down));
+      }
+      return;
+    }
     try {
       final request = await _client
           .getUrl(Uri.parse('http://127.0.0.1:$_port/debug/vars'))
@@ -107,35 +121,38 @@ class Traffic extends ValueNotifier<TrafficSample> {
         return;
       }
       final body = await utf8.decoder.bind(response).join();
-      final totals = TrafficCounters.total(body);
-      final now = DateTime.now();
-      final previousAt = _lastAt;
-      final previousUp = _lastUp;
-      final previousDown = _lastDown;
-      if (previousAt != null && previousUp != null && previousDown != null) {
-        final seconds = now.difference(previousAt).inMilliseconds / 1000;
-        // Счётчики обнуляются при reconnect: отрицательная дельта — не скорость.
-        final up = totals.up - previousUp;
-        final down = totals.down - previousDown;
-        if (seconds >= 0.5 && up >= 0 && down >= 0) {
-          value = TrafficSample(
-            up: (up / seconds).round(),
-            down: (down / seconds).round(),
-          );
-        } else {
-          // Счётчики обнулились при перезапуске ядра — старая скорость больше
-          // не имеет отношения к действительности.
-          _resetSample();
-        }
-      }
-      _lastUp = totals.up;
-      _lastDown = totals.down;
-      _lastAt = now;
+      _applySample(TrafficCounters.total(body));
     } on Object {
       // Метрики — необязательная деталь интерфейса: ядро могло ещё не
       // поднять сервер, порт занят или соединение закрылось. Не шумим в журнал,
       // но и не показываем последнюю скорость как текущую.
       _resetSample();
     }
+  }
+
+  void _applySample(TrafficSample totals) {
+    final now = DateTime.now();
+    final previousAt = _lastAt;
+    final previousUp = _lastUp;
+    final previousDown = _lastDown;
+    if (previousAt != null && previousUp != null && previousDown != null) {
+      final seconds = now.difference(previousAt).inMilliseconds / 1000;
+      // Счётчики обнуляются при reconnect: отрицательная дельта — не скорость.
+      final up = totals.up - previousUp;
+      final down = totals.down - previousDown;
+      if (seconds >= 0.5 && up >= 0 && down >= 0) {
+        value = TrafficSample(
+          up: (up / seconds).round(),
+          down: (down / seconds).round(),
+        );
+      } else {
+        // Счётчики обнулились при перезапуске ядра — старая скорость больше
+        // не имеет отношения к действительности.
+        _resetSample();
+      }
+    }
+    _lastUp = totals.up;
+    _lastDown = totals.down;
+    _lastAt = now;
   }
 }

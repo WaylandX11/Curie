@@ -1,6 +1,7 @@
 import '../models/subscription.dart';
 import 'app_log.dart';
 import 'device_identity.dart';
+import 'geo_assets.dart';
 import 'store.dart';
 import 'subscription_service.dart';
 import 'user_agent.dart';
@@ -15,12 +16,16 @@ class Subscriptions {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return const SubscriptionException('noLinks');
 
-    final exists = Store.instance.state.value.subscriptions.any((s) => s.url == trimmed);
+    final exists = Store.instance.state.value.subscriptions.any(
+      (s) => s.url == trimmed,
+    );
     if (exists) return null;
 
     final draft = Subscription(
       url: trimmed,
-      title: title.trim().isEmpty ? (Uri.tryParse(trimmed)?.host ?? trimmed) : title.trim(),
+      title: title.trim().isEmpty
+          ? (Uri.tryParse(trimmed)?.host ?? trimmed)
+          : title.trim(),
     );
 
     try {
@@ -30,9 +35,11 @@ class Subscriptions {
         userAgent: await currentUserAgent(),
         proxyPort: Vpn.tunnelProxyPort,
       );
-      await Store.instance.update((state) => state.copyWith(
-            subscriptions: [...state.subscriptions, loaded],
-          ));
+      await Store.instance.update(
+        (state) =>
+            state.copyWith(subscriptions: [...state.subscriptions, loaded]),
+      );
+      await GeoAssets.noteSubscription(loaded);
       return null;
     } on SubscriptionException catch (e) {
       return e;
@@ -41,7 +48,9 @@ class Subscriptions {
     }
   }
 
-  static Future<SubscriptionException?> refresh(Subscription subscription) async {
+  static Future<SubscriptionException?> refresh(
+    Subscription subscription,
+  ) async {
     try {
       final loaded = await _service.refresh(
         subscription,
@@ -50,22 +59,27 @@ class Subscriptions {
         proxyPort: Vpn.tunnelProxyPort,
       );
       await _replace(loaded);
-      AppLog.add('subscription', 'обновлена: ${loaded.title} (узлов: ${loaded.nodes.length})');
+      await GeoAssets.noteSubscription(loaded);
+      AppLog.add(
+        'subscription',
+        'обновлена: ${loaded.title} (узлов: ${loaded.nodes.length})',
+      );
       return null;
     } on SubscriptionException catch (e) {
       AppLog.add('subscription', 'ошибка ${e.code}: ${e.detail ?? ''}');
-      await _replace(subscription.copyWith(
-        lastError: e.code,
-        lastErrorDetail: e.detail,
-      ));
+      await _replace(
+        subscription.copyWith(lastError: e.code, lastErrorDetail: e.detail),
+      );
       return e;
     } on Object catch (e) {
       final failure = SubscriptionException('network', e.toString());
       AppLog.add('subscription', 'ошибка обновления: $e');
-      await _replace(subscription.copyWith(
-        lastError: failure.code,
-        lastErrorDetail: failure.detail,
-      ));
+      await _replace(
+        subscription.copyWith(
+          lastError: failure.code,
+          lastErrorDetail: failure.detail,
+        ),
+      );
       return failure;
     }
   }
@@ -86,25 +100,31 @@ class Subscriptions {
   }
 
   static Future<void> remove(String url) async {
-    await Store.instance.update((state) => state.copyWith(
-          subscriptions: state.subscriptions.where((s) => s.url != url).toList(),
-        ));
+    await Store.instance.update(
+      (state) => state.copyWith(
+        subscriptions: state.subscriptions.where((s) => s.url != url).toList(),
+      ),
+    );
   }
 
   /// Развёрнутость списка узлов сохраняется рядом с подпиской.
   static Future<void> setExpanded(String url, bool expanded) async {
-    await Store.instance.update((state) => state.copyWith(
-          subscriptions: state.subscriptions
-              .map((s) => s.url == url ? s.copyWith(expanded: expanded) : s)
-              .toList(),
-        ));
+    await Store.instance.update(
+      (state) => state.copyWith(
+        subscriptions: state.subscriptions
+            .map((s) => s.url == url ? s.copyWith(expanded: expanded) : s)
+            .toList(),
+      ),
+    );
   }
 
   static Future<void> _replace(Subscription subscription) async {
-    await Store.instance.update((state) => state.copyWith(
-          subscriptions: state.subscriptions
-              .map((s) => s.url == subscription.url ? subscription : s)
-              .toList(),
-        ));
+    await Store.instance.update(
+      (state) => state.copyWith(
+        subscriptions: state.subscriptions
+            .map((s) => s.url == subscription.url ? subscription : s)
+            .toList(),
+      ),
+    );
   }
 }

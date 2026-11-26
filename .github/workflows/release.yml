@@ -71,14 +71,21 @@ jobs:
         working-directory: app
         run: flutter build apk --release
 
-      - name: Prepare release asset
+      - name: Prepare release assets
         run: |
           set -euo pipefail
-          apk="app/build/app/outputs/flutter-apk/app-release.apk"
-          name="curie-${GITHUB_REF_NAME}-universal.apk"
-          cp "$apk" "$name"
-          sha256sum "$name" > "$name.sha256"
-          ls -lh "$name"
+          src="app/build/app/outputs/flutter-apk"
+          for variant in universal arm64-v8a armeabi-v7a x86_64; do
+            case "$variant" in
+              universal) apk="$src/app-release.apk" ;;
+              *) apk="$src/app-$variant-release.apk" ;;
+            esac
+            name="curie-${GITHUB_REF_NAME}-$variant.apk"
+            test -s "$apk" || { echo "Нет APK: $apk"; exit 1; }
+            cp "$apk" "$name"
+            sha256sum "$name" > "$name.sha256"
+            ls -lh "$name"
+          done
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

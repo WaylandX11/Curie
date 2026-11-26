@@ -67,4 +67,15 @@ void main() {
     expect(inbounds.single['tag'], 'proxy');
     expect(inbounds.single['port'], 30000);
   });
+
+  test('check port is found by tag even with SOCKS ahead of it', () {
+    final inbounds = <Object>[
+      {'tag': 'socks', 'port': 23456, 'protocol': 'socks'},
+      {'tag': 'check', 'port': 12345, 'protocol': 'http'},
+    ];
+
+    expect(Vpn.portOfInbound(inbounds, 'check'), 12345);
+    expect(Vpn.portOfInbound(inbounds, 'socks'), 23456);
+    expect(Vpn.portOfInbound(inbounds, 'missing'), 0);
+  });
 }

@@ -19,15 +19,25 @@ String buildXrayConfig({
   int metricsPort = 49227,
   int checkPort = 0,
   String logPath = '',
+  String? geoAssetDir,
 }) {
-  final config = <String, dynamic>{
-    ...?base,
-  };
+  final config = <String, dynamic>{...?base};
+
+  // Xray ищет geoip.dat/geosite.dat в каталоге из `xray.location.asset`.
+  // На Windows TUN-дескриптор не нужен, но каталог баз должен дойти до ядра.
+  final env =
+      (config['env'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+  if (geoAssetDir != null && geoAssetDir.isNotEmpty) {
+    env['xray.location.asset'] = geoAssetDir;
+    env['XRAY_LOCATION_ASSET'] = geoAssetDir;
+  }
+  if (env.isNotEmpty) config['env'] = env;
 
   // Ключ именно `logLevel`: старый `loglevel` ядро не понимало и молча
   // использовало warning. При выключенном журнале levels none отключает и
   // stdout, и запись в файл.
-  final logging = settings.xrayLogEnabled &&
+  final logging =
+      settings.xrayLogEnabled &&
       settings.xrayLogLevel != XrayLogLevel.none &&
       logPath.isNotEmpty;
   config['log'] = logging
@@ -39,19 +49,16 @@ String buildXrayConfig({
           // `full` маскирует ipv4 и ipv6 полностью.
           'maskAddress': 'full',
         }
-      : {
-          'logLevel': 'none',
-          'error': 'none',
-          'access': 'none',
-        };
+      : {'logLevel': 'none', 'error': 'none', 'access': 'none'};
 
   // Счётчики трафика для индикатора скорости. Метрики читаются локально,
   // через 127.0.0.1, и не создают ещё одного слушателя наружу.
   config['metrics'] = {'listen': '127.0.0.1:$metricsPort'};
   config['stats'] = <String, dynamic>{};
-  final policy = (base?['policy'] as Map?)?.cast<String, dynamic>() ??
-      <String, dynamic>{};
-  final system = (policy['system'] as Map?)?.cast<String, dynamic>() ??
+  final policy =
+      (base?['policy'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+  final system =
+      (policy['system'] as Map?)?.cast<String, dynamic>() ??
       <String, dynamic>{};
   config['policy'] = {
     ...policy,
@@ -64,9 +71,7 @@ String buildXrayConfig({
     },
   };
 
-  final merged = <Map<String, dynamic>>[
-    ...outbounds,
-  ];
+  final merged = <Map<String, dynamic>>[...outbounds];
   if (!_hasTag(merged, 'direct')) {
     merged.add({'tag': 'direct', 'protocol': 'freedom'});
   }
@@ -88,12 +93,11 @@ String buildXrayConfig({
   // серверу, а при его недоступности — по запасному.
   final panelBalancers = _panelBalancers(base);
   final panelRules = _panelRules(base);
-  final hasBalancerRule =
-      panelRules.any((rule) => rule['balancerTag'] != null);
+  final hasBalancerRule = panelRules.any((rule) => rule['balancerTag'] != null);
   final autoBalancerTag =
       proxies.length > 1 && panelBalancers.isEmpty && !hasBalancerRule
-          ? 'curie-auto-balancer'
-          : null;
+      ? 'curie-auto-balancer'
+      : null;
   final balancers = <Map<String, dynamic>>[
     ...panelBalancers,
     if (autoBalancerTag != null)
@@ -121,33 +125,73 @@ String buildXrayConfig({
     }
   }
 
+  // Проверка сети, подписки и DNS должны идти туда же, куда и обычный трафик:
+  // через балансировщик с fallbackTag. Иначе при отказе основного узла
+  // запасной работает, а локальный прокси и сторож висят на мёртвом outbound.
+  const dnsInboundTag = 'curie-dns';
+  final withFallback = balancers
+      .where((balancer) => balancer['fallbackTag'] != null)
+      .toList();
+  final trafficBalancer = withFallback.isNotEmpty
+      ? withFallback.first
+      : (balancers.isNotEmpty ? balancers.first : null);
+  final trafficBalancerTag = trafficBalancer?['tag'] as String?;
+  final dnsViaBalancer =
+      settings.dnsRoute == DnsRoute.tunnel && trafficBalancerTag != null;
+
   // Свои inbound'ы панели (socks/http на 127.0.0.1) не нужны: трафик приходит
-  // из TUN. Исключение — локальный HTTP-прокси для кнопки «Проверить»: он
-  // слушает только 127.0.0.1 и позволяет приложению (исключённому из VPN)
-  // всё же сделать запрос через рабочий outbound.
+  // из TUN или локального SOCKS5. Исключение — HTTP-прокси для «Проверить»:
+  // он слушает только 127.0.0.1 и делает запрос через рабочий outbound.
   config['inbounds'] = [
-    {
-      'tag': 'tun',
-      'port': 0,
-      'protocol': 'tun',
-      'settings': {
-        // Имя обязательно: без него Xray зовёт net.Interfaces() для генерации
-        // utun-имени, а Android запрещает netlink обычному приложению
-        // ("route ip+net: netlinkrib: permission denied").
-        'name': 'curie-tun',
-        'mtu': settings.mtu,
+    if (settings.tunnelMode.hasTun)
+      {
+        'tag': 'tun',
+        'port': 0,
+        'protocol': 'tun',
+        'settings': {
+          // Имя обязательно: без него Xray зовёт net.Interfaces() для генерации
+          // utun-имени, а Android запрещает netlink обычному приложению
+          // ("route ip+net: netlinkrib: permission denied").
+          'name': 'curie-tun',
+          'mtu': settings.mtu,
+        },
+        // Без сниффинга Xray видит только IP: доменные правила панели
+        // (`domain:vk.com`, `full:mos.ru` и т.п.) никогда не срабатывают.
+        'sniffing': {
+          'enabled': true,
+          'destOverride': ['http', 'tls', 'quic'],
+          // Подменяем адрес и для dial: иначе direct уходит на IP, полученный
+          // через вышестоящий DNS прокси, и белые списки панели не открываются.
+          // С domainStrategy IPIfNonMatch доменные и IP-правила работают вместе.
+          'routeOnly': false,
+        },
       },
-      // Без сниффинга Xray видит только IP: доменные правила панели
-      // (`domain:vk.com`, `full:mos.ru` и т.п.) никогда не срабатывают.
-      'sniffing': {
-        'enabled': true,
-        'destOverride': ['http', 'tls', 'quic'],
-        // Подменяем адрес и для dial: иначе direct уходит на IP, полученный
-        // через вышестоящий DNS прокси, и белые списки панели не открываются.
-        // С domainStrategy IPIfNonMatch доменные и IP-правила работают вместе.
-        'routeOnly': false,
+    if (settings.tunnelMode.hasProxy)
+      {
+        'tag': 'socks',
+        'protocol': 'socks',
+        'listen': '127.0.0.1',
+        'port': settings.effectiveSocksPort,
+        'settings': <String, dynamic>{
+          'udp': true,
+          if (settings.socksAuth)
+            'auth': 'password'
+          else
+            'auth': 'noauth',
+          if (settings.socksAuth)
+            'accounts': [
+              {
+                'user': settings.socksUsername,
+                'pass': settings.effectiveSocksPassword,
+              },
+            ],
+        },
+        'sniffing': {
+          'enabled': true,
+          'destOverride': ['http', 'tls', 'quic'],
+          'routeOnly': false,
+        },
       },
-    },
     if (checkPort > 0 && proxyTag != null)
       {
         'tag': 'check',
@@ -158,37 +202,48 @@ String buildXrayConfig({
       },
   ];
 
-  // DNS по умолчанию идёт через тот же outbound, что и обычный трафик:
-  // белые списки панели не обрывают резолвинг, провайдер не видит имена.
-  // Адрес сервера узла при этом резолвится системным резолвером Kotlin
-  // (LibXray.setDNS), поэтому петли не возникает.
+  // DNS по умолчанию идёт через тот же путь, что и обычный трафик. Когда есть
+  // балансировщик, запросы DNS идут через него — вместе с основным узлом
+  // автоматически работает и запасной.
   config['dns'] = _dns(
     base?['dns'],
     settings,
-    settings.dnsRoute == DnsRoute.tunnel ? proxyTag : 'direct',
+    dnsViaBalancer
+        ? null
+        : settings.dnsRoute == DnsRoute.tunnel
+        ? proxyTag
+        : 'direct',
+    inboundTag: dnsViaBalancer ? dnsInboundTag : null,
   );
 
   config['routing'] = _routing(
     base?['routing'],
     settings,
     checkOutbound: checkPort > 0 ? proxyTag : null,
+    checkBalancerTag: checkPort > 0 ? trafficBalancerTag : null,
+    dnsBalancerTag: dnsViaBalancer ? trafficBalancerTag : null,
+    dnsInboundTag: dnsInboundTag,
     balancers: balancers,
     catchAllBalancer: autoBalancerTag,
   );
 
   // Observatory нужен стратегиям leastPing/leastLoad и fallbackTag — без него
   // балансировщик не определит, какой сервер жив, и ядро не запустится.
-  if (base?['observatory'] != null) config['observatory'] = base!['observatory'];
+  if (base?['observatory'] != null) {
+    config['observatory'] = base!['observatory'];
+  }
   if (base?['burstObservatory'] != null) {
     config['burstObservatory'] = base!['burstObservatory'];
   } else if ((autoBalancerTag != null || addedFallbackTag) &&
       base?['observatory'] == null) {
     config['burstObservatory'] = {
-      'subjectSelector': [
-        for (final outbound in proxies) Servers.tag(outbound),
-      ].whereType<String>().toList(),
+      'subjectSelector': [for (final outbound in proxies) Servers.tag(outbound)]
+          .whereType<String>()
+          .toList(),
       'pingConfig': {
-        'destination': 'http://www.gstatic.com/generate_204',
+        // Как и сторож/проверка: gstatic недоступен с части выходов, из-за
+        // чего балансировщик ошибочно помечал живые узлы мёртвыми.
+        'destination': 'https://cp.cloudflare.com/generate_204',
         'interval': '30s',
         'timeout': '5s',
         'sampling': 1,
@@ -199,14 +254,20 @@ String buildXrayConfig({
   return jsonEncode(config);
 }
 
-Map<String, dynamic> _dns(Object? panelDns, Settings settings, String? tag) {
+Map<String, dynamic> _dns(
+  Object? panelDns,
+  Settings settings,
+  String? tag, {
+  String? inboundTag,
+}) {
   Map<String, dynamic>? rest;
   List<dynamic> servers;
 
   // По умолчанию берём DNS из подписки: он учитывает белые списки панели.
   // Резервный 77.88.8.8 используется, только если подписка не прислала DNS
   // или пользователь явно выбрал фиксированный адрес в настройках.
-  final usePanelDns = settings.dnsUsePanel &&
+  final usePanelDns =
+      settings.dnsUsePanel &&
       panelDns is Map &&
       (panelDns['servers'] as List?)?.isNotEmpty == true;
 
@@ -214,24 +275,21 @@ Map<String, dynamic> _dns(Object? panelDns, Settings settings, String? tag) {
     rest = panelDns.cast<String, dynamic>();
     servers = rest['servers'] as List;
   } else {
-    servers = [
-      settings.dns,
-      if (settings.dns != '8.8.8.8') '8.8.8.8',
-    ];
+    servers = [settings.dns, if (settings.dns != '8.8.8.8') '8.8.8.8'];
   }
 
+  // Когда DNS идёт через балансировщик, все запросы должны нести один тег:
+  // серверы панели со своим `tag` иначе уйдут на закреплённый outbound.
+  final dnsTag = inboundTag ?? tag;
   final normalized = servers.map((server) {
     if (server is String) {
-      return <String, dynamic>{
-        'address': server,
-        'tag': ?tag,
-      };
+      return <String, dynamic>{'address': server, 'tag': ?dnsTag};
     }
     if (server is Map) {
       final advanced = server.cast<String, dynamic>();
       return <String, dynamic>{
         ...advanced,
-        'tag': ?(tag != null && advanced['tag'] == null ? tag : null),
+        'tag': ?(dnsTag ?? advanced['tag']),
       };
     }
     return server;
@@ -241,6 +299,7 @@ Map<String, dynamic> _dns(Object? panelDns, Settings settings, String? tag) {
     ...?rest,
     'servers': normalized,
     'queryStrategy': (rest?['queryStrategy'] as String?) ?? 'UseIPv4',
+    'tag': ?inboundTag,
   };
 }
 
@@ -248,6 +307,9 @@ Map<String, dynamic> _routing(
   Object? panelRouting,
   Settings settings, {
   String? checkOutbound,
+  String? checkBalancerTag,
+  String? dnsBalancerTag,
+  String? dnsInboundTag,
   required List<Map<String, dynamic>> balancers,
   String? catchAllBalancer,
 }) {
@@ -302,15 +364,32 @@ Map<String, dynamic> _routing(
   return {
     ...routing,
     'rules': [
-      // Проверочный запрос должен идти через рабочий outbound даже если
-      // панель его адрес записала в белый список.
-      if (checkOutbound != null)
+      // Проверочный запрос идёт туда же, куда и обычный трафик: через
+      // балансировщик с fallbackTag, а не через один закреплённый outbound.
+      if (checkOutbound != null || checkBalancerTag != null)
         {
           'type': 'field',
           'inboundTag': ['check'],
-          'outboundTag': checkOutbound,
+          'outboundTag': ?(checkBalancerTag == null ? checkOutbound : null),
+          'balancerTag': ?checkBalancerTag,
         },
-      dnsRule,
+      if (settings.tunnelMode.hasTun) dnsRule,
+      // SOCKS5 идёт по тому же рабочему пути, что и check/TUN.
+      if (settings.tunnelMode.hasProxy &&
+          (checkOutbound != null || checkBalancerTag != null))
+        {
+          'type': 'field',
+          'inboundTag': ['socks'],
+          'outboundTag': ?(checkBalancerTag == null ? checkOutbound : null),
+          'balancerTag': ?checkBalancerTag,
+        },
+      // DNS, сгенерированный ядром, тоже должен попадать в балансировщик.
+      if (dnsBalancerTag != null && dnsInboundTag != null)
+        {
+          'type': 'field',
+          'inboundTag': [dnsInboundTag],
+          'balancerTag': dnsBalancerTag,
+        },
       ...rules,
       // Правило панели с balancerTag имеет приоритет: добавленный балансир
       // подключается только когда панель не указала свой.
@@ -349,8 +428,9 @@ String? _firstUnselectedProxy(
   Object? selector,
   List<Map<String, dynamic>> proxies,
 ) {
-  final prefixes =
-      selector is List ? selector.whereType<String>() : const <String>[];
+  final prefixes = selector is List
+      ? selector.whereType<String>()
+      : const <String>[];
   for (final outbound in proxies) {
     final tag = Servers.tag(outbound);
     if (tag == null) continue;

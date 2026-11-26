@@ -13,6 +13,14 @@ void main() {
     expect(RoutingMode.fromName(null), RoutingMode.all);
   });
 
+  test('experimental Rust core setting is mirrored and off by default', () {
+    expect(const Settings().useRustCore, isFalse);
+    final restored = Settings.fromJson(
+      const Settings(useRustCore: true).toJson(),
+    );
+    expect(restored.useRustCore, isTrue);
+  });
+
   test('DNS comes from the subscription by default', () {
     const settings = Settings();
     expect(settings.dnsUsePanel, isTrue);

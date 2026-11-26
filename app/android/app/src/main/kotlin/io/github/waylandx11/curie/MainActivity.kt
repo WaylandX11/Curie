@@ -11,6 +11,8 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -118,9 +120,19 @@ class MainActivity : FlutterActivity() {
                 "connect" -> startTunnel(connectIntent(call.arguments()), result)
 
                 "disconnect" -> {
+                    // Останавливаем оба сервиса: пользователь мог выключить
+                    // экспериментальный переключатель во время работы туннеля.
                     CurieVpnService.disconnect(this)
+                    CurieRustVpnService.disconnect(this)
                     result.success(null)
                 }
+
+                // Версия Rust-ядра. Go-версию Dart запрашивает через `invoke`.
+                "rustCoreVersion" -> result.success(CurieRustVpnService.version())
+
+                // Накопительные счётчики Rust-ядра. Показываются вместо
+                // HTTP-метрик libXray, когда включён experimental-режим.
+                "rustTraffic" -> result.success(CurieRustVpnService.currentTraffic())
 
                 "status" -> result.success(
                     HashMap<String, Any?>().apply {
@@ -129,6 +141,14 @@ class MainActivity : FlutterActivity() {
                         putAll(CurieBridge.session())
                     }
                 )
+
+                // Токен процесса: нужен, чтобы журнал не писал «запуск Curie»
+                // при каждом пересоздании Flutter-движка.
+                "processToken" -> result.success(CurieBridge.processToken())
+
+                // Geo-базы обновляем только по безлимитной сети, если включён
+                // переключатель «Только по Wi-Fi». Собственный VPN не учитываем.
+                "isUnmeteredNetwork" -> result.success(isUnmeteredNetwork())
 
                 // ANDROID_ID: стабилен для пары «устройство + подпись приложения»,
                 // живёт после переустановки. В Dart из него выводится HWID через HMAC,
@@ -248,10 +268,31 @@ class MainActivity : FlutterActivity() {
         @Suppress("UNCHECKED_CAST")
         val args = arguments as? Map<String, Any?> ?: return null
         val config = args["config"] as? String ?: return null
+        val tunnelMode = args["tunnelMode"] as? String ?: "tun"
+        val useRust = args["useRustCore"] == true
+        // AAR управляет TUN сам и не умеет работать без VpnService: режим
+        // «Proxy» остаётся на проверенном libXray-пути.
+        val rust = useRust && tunnelMode != "proxy"
+        val service = if (rust) CurieRustVpnService::class.java else CurieVpnService::class.java
+        val configExtra = if (rust) {
+            CurieRustVpnService.EXTRA_CONFIG
+        } else {
+            CurieVpnService.EXTRA_CONFIG
+        }
 
-        return Intent(this, CurieVpnService::class.java).apply {
-            action = CurieVpnService.ACTION_CONNECT
-            putExtra(CurieVpnService.EXTRA_CONFIG, config)
+        return Intent(this, service).apply {
+            action = if (rust) {
+                CurieRustVpnService.ACTION_CONNECT
+            } else {
+                CurieVpnService.ACTION_CONNECT
+            }
+            putExtra(configExtra, config)
+            putExtra(CurieVpnService.EXTRA_TUNNEL_MODE, tunnelMode)
+            putExtra(CurieVpnService.EXTRA_USE_RUST_CORE, rust)
+            putExtra(
+                CurieVpnService.EXTRA_GEO_DIR,
+                args["geoDir"] as? String ?: "",
+            )
             putExtra(CurieVpnService.EXTRA_DNS, (args["dns"] as? String) ?: "77.88.8.8")
             putExtra(CurieVpnService.EXTRA_MTU, (args["mtu"] as? Int) ?: 1500)
             putExtra(CurieVpnService.EXTRA_MODE, (args["mode"] as? String) ?: "all")
@@ -285,6 +326,12 @@ class MainActivity : FlutterActivity() {
             )
             return
         }
+        // SOCKS5 без TUN не требует разрешения VpnService.
+        if (intent.getStringExtra(CurieVpnService.EXTRA_TUNNEL_MODE) == "proxy") {
+            startTunnelService(intent)
+            result.success(null)
+            return
+        }
         prepareVpn(intent, result)
     }
 
@@ -296,8 +343,17 @@ class MainActivity : FlutterActivity() {
             startActivityForResult(prepare, VPN_REQUEST)
             return
         }
-        CurieVpnService.start(this, intent)
+        startTunnelService(intent)
         result.success(null)
+    }
+
+    /** Один путь запуска и до, и после диалога разрешения VPN. */
+    private fun startTunnelService(intent: Intent) {
+        if (intent.getBooleanExtra(CurieVpnService.EXTRA_USE_RUST_CORE, false)) {
+            CurieRustVpnService.start(this, intent)
+        } else {
+            CurieVpnService.start(this, intent)
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -325,7 +381,7 @@ class MainActivity : FlutterActivity() {
             pendingConnect = null
             pendingResult = null
             if (resultCode == Activity.RESULT_OK && intent != null) {
-                CurieVpnService.start(this, intent)
+                startTunnelService(intent)
                 result?.success(null)
             } else {
                 result?.error("vpn_denied", "VPN permission denied", null)
@@ -333,6 +389,18 @@ class MainActivity : FlutterActivity() {
             return
         }
         super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    /** Есть ли безлимитная сеть мимо собственного VPN. */
+    private fun isUnmeteredNetwork(): Boolean {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return false
+        return manager.allNetworks.any { network ->
+            val caps = manager.getNetworkCapabilities(network) ?: return@any false
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
+        }
     }
 
     /**

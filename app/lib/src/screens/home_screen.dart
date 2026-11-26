@@ -10,8 +10,10 @@ import '../models/subscription.dart';
 import '../services/app_log.dart';
 import '../services/connection.dart';
 import '../services/connection_check.dart';
+import '../services/core.dart';
 import '../services/core_log.dart';
 import '../services/country.dart';
+import '../services/geo_assets.dart';
 import '../services/ping.dart';
 import '../services/store.dart';
 import '../services/subscriptions.dart';
@@ -41,12 +43,16 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _busy = false;
   String _appVersion = '';
   String _coreVersion = '';
+  bool _rustCore = rustCoreEnabled;
   VpnStatus _status = VpnStatus.disconnected;
 
   Timer? _ticker;
+  Timer? _connectWatchdog;
   Duration _uptime = Duration.zero;
   bool _checking = false;
   CheckResult? _lastCheck;
+  int _geoRestartSeen = 0;
+  bool _restartingGeo = false;
 
   @override
   void initState() {
@@ -54,41 +60,145 @@ class _HomeScreenState extends State<HomeScreen> {
     _status = Vpn.status.value;
     Vpn.status.addListener(_onStatus);
     UpdateNotifier.coreDialog.addListener(_onCoreDialog);
+    GeoAssets.prompt.addListener(_onGeoPrompt);
+    GeoAssets.restartRequested.addListener(_onGeoRestart);
+    Store.instance.state.addListener(_onSettingsChanged);
+    _geoRestartSeen = GeoAssets.restartRequested.value;
     _loadVersions();
     _syncTimer();
-    // Уведомление могло прийти до монтирования экрана (проверка запускается
-    // сразу после первого кадра приложения) — не теряем его.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onCoreDialog());
+    // Уведомления могли прийти до монтирования экрана — не теряем их.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onCoreDialog();
+      _onGeoPrompt();
+      _onGeoRestart();
+    });
   }
 
   @override
   void dispose() {
     Vpn.status.removeListener(_onStatus);
     UpdateNotifier.coreDialog.removeListener(_onCoreDialog);
+    GeoAssets.prompt.removeListener(_onGeoPrompt);
+    GeoAssets.restartRequested.removeListener(_onGeoRestart);
+    Store.instance.state.removeListener(_onSettingsChanged);
     _ticker?.cancel();
+    _connectWatchdog?.cancel();
     super.dispose();
+  }
+
+  /// AAR может потерять колбэк запуска при подмене узла. Без таймера кнопка
+  /// оставалась бы в «Подключение…» до перезапуска приложения.
+  void _armConnectWatchdog() {
+    _connectWatchdog?.cancel();
+    _connectWatchdog = Timer(const Duration(seconds: 25), () {
+      _connectWatchdog = null;
+      AppLog.add('vpn', 'таймаут подключения: ядро не подтвердило запуск');
+      unawaited(Vpn.disconnect());
+      if (mounted) {
+        showMessage(
+          context,
+          AppLocalizations.of(context).tr('connectionTimeout'),
+        );
+      }
+    });
+  }
+
+  void _cancelConnectWatchdog() {
+    _connectWatchdog?.cancel();
+    _connectWatchdog = null;
   }
 
   void _onCoreDialog() {
     final notice = UpdateNotifier.coreDialog.value;
     if (notice == null || !mounted) return;
     UpdateNotifier.dismissDialog();
-    showUpdateDialog(
-      context,
-      notice.release,
-      coreUpdated: notice.coreUpdated,
+    showUpdateDialog(context, notice.release, coreUpdated: notice.coreUpdated);
+  }
+
+  void _onGeoPrompt() {
+    if (!GeoAssets.prompt.value || !mounted) return;
+    GeoAssets.dismissPrompt();
+    final l10n = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.tr('geoAssetsNeededTitle')),
+        content: Text(l10n.tr('geoAssetsNeededBody')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.tr('geoAssetsLater')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              unawaited(_downloadGeoAssets());
+            },
+            child: Text(l10n.tr('geoAssetsDownloadAll')),
+          ),
+        ],
+      ),
     );
   }
 
+  Future<void> _downloadGeoAssets() async {
+    final l10n = AppLocalizations.of(context);
+    final errors = await GeoAssets.downloadAll(proxyPort: Vpn.tunnelProxyPort);
+    if (!mounted) return;
+    final failed = errors.entries
+        .where((entry) => entry.value != null)
+        .map((entry) => '${entry.key.fileName}: ${entry.value}')
+        .toList();
+    if (failed.isEmpty) {
+      showMessage(context, l10n.tr('geoAssetsReady'));
+    } else {
+      showMessage(
+        context,
+        l10n.fmt('geoAssetsFailed', {
+          'file': 'geoip.dat / geosite.dat',
+          'error': failed.join('; '),
+        }),
+      );
+    }
+  }
+
+  void _onGeoRestart() {
+    final value = GeoAssets.restartRequested.value;
+    if (value <= _geoRestartSeen) return;
+    _geoRestartSeen = value;
+    if (!mounted || _busy || _restartingGeo) return;
+    final settings = Store.instance.state.value.settings;
+    final profile = Store.instance.state.value.selected;
+    if (!settings.geoAssetsRestartXray ||
+        profile == null ||
+        Vpn.status.value != VpnStatus.connected) {
+      return;
+    }
+    _restartingGeo = true;
+    unawaited(() async {
+      try {
+        await _connect(profile);
+      } finally {
+        _restartingGeo = false;
+      }
+    }());
+  }
+
+  void _onSettingsChanged() {
+    // Переключатель ядра меняется на экране настроек: подпись главного экрана
+    // должна сразу показать версию выбранного ядра, а не старую с запроса при старте.
+    final useRust = rustCoreEnabled;
+    if (useRust == _rustCore) return;
+    _rustCore = useRust;
+    _loadVersions();
+  }
+
   Future<void> _loadVersions() async {
-    final core = Vpn.isSupported ? await const Xray().version() : '';
+    final version = await coreVersion();
     if (!mounted) return;
     setState(() {
       _appVersion = buildStamp;
-      _coreVersion = core.replaceFirst(
-        RegExp(r'^Xray\s+', caseSensitive: false),
-        '',
-      );
+      _coreVersion = version;
     });
   }
 
@@ -97,6 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final next = Vpn.status.value;
     setState(() => _status = next);
     _syncTimer();
+    if (next != VpnStatus.connecting && next != VpnStatus.disconnecting) {
+      _cancelConnectWatchdog();
+    }
 
     if (next == VpnStatus.error) {
       final message = Vpn.lastError.value ?? '';
@@ -182,6 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final settings = Store.instance.state.value.settings;
 
     setState(() => _busy = true);
+    _armConnectWatchdog();
     try {
       final outbounds = await outboundsFor(profile);
       final base = baseConfigOf(profile);
@@ -195,6 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Файл может быть ещё открыт старым ядром: чистим его только на старте
       // приложения, когда туннель гарантированно не работает.
       final logPath = await CoreLog.ensurePath();
+      final geoAssetDir = await GeoAssets.assetDirectory();
       _lastCheck = null;
       await Vpn.connect(
         config: buildXrayConfig(
@@ -204,15 +319,19 @@ class _HomeScreenState extends State<HomeScreen> {
           metricsPort: metricsPort,
           checkPort: checkPort,
           logPath: logPath,
+          geoAssetDir: geoAssetDir,
         ),
         settings: settings,
+        geoDir: geoAssetDir,
       );
     } on VpnException catch (e) {
+      _cancelConnectWatchdog();
       AppLog.add('vpn', 'ошибка канала: ${e.code} ${e.message}');
       if (mounted) {
         showMessage(context, e.isDenied ? l10n.tr('vpnDenied') : e.message);
       }
     } catch (e, stack) {
+      _cancelConnectWatchdog();
       AppLog.add('vpn', 'ошибка ${e.runtimeType}: $e');
       AppLog.add('vpn', stack.toString().split('\n').take(3).join(' | '));
       if (mounted) _showError('${e.runtimeType}: $e');
@@ -323,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(
               [
                 if (_appVersion.isNotEmpty) 'v$_appVersion',
-                if (_coreVersion.isNotEmpty) 'Xray $_coreVersion',
+                if (_coreVersion.isNotEmpty) coreLabel(_coreVersion),
               ].join(' · '),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,

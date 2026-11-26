@@ -23,6 +23,13 @@ class Store {
       if (json.isNotEmpty) {
         state.value = AppState.fromJson(json);
       }
+      // При первом запуске (пустой файл) порт и пароль SOCKS5 ещё не созданы.
+      // Фиксируем их сразу, чтобы они не менялись между перезапусками.
+      final settings = state.value.settings.materializeSocksDefaults();
+      if (!identical(settings, state.value.settings)) {
+        state.value = state.value.copyWith(settings: settings);
+        await _vault.write(state.value.toJson());
+      }
     } on Object {
       // Повреждённый файл или недоступный ключ: стартуем с чистого состояния,
       // но не падаем — пользователь сможет добавить сервер заново.

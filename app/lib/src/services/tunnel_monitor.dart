@@ -17,7 +17,17 @@ class TunnelMonitor {
   }
 
   static void _onStatus() {
-    if (Vpn.status.value == VpnStatus.connected && Vpn.metricsPort.value > 0) {
+    if (Vpn.status.value != VpnStatus.connected) {
+      Traffic.stop();
+      return;
+    }
+    if (Vpn.isRustActive) {
+      // Rust не поднимает HTTP-метрики: Traffic берёт счётчики из MethodChannel,
+      // порт здесь нужен только как ключ опроса.
+      Traffic.start(
+        Vpn.metricsPort.value > 0 ? Vpn.metricsPort.value : Traffic.defaultPort,
+      );
+    } else if (Vpn.metricsPort.value > 0) {
       Traffic.start(Vpn.metricsPort.value);
     } else {
       Traffic.stop();

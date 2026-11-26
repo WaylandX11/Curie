@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../generated/build_info.dart';
@@ -5,8 +7,11 @@ import '../generated/core_info.dart';
 import '../l10n/app_localizations.dart';
 import '../models/app_state.dart';
 import '../models/settings.dart';
+import '../services/app_log.dart';
 import '../services/apps.dart';
+import '../services/core.dart';
 import '../services/device_identity.dart';
+import '../services/geo_assets.dart';
 import '../services/locale_controller.dart';
 import '../services/store.dart';
 import '../services/theme_controller.dart';
@@ -26,10 +31,9 @@ const _dnsPresets = ['77.88.8.8', '1.1.1.1', '8.8.8.8', '9.9.9.9'];
 const _dnsPanel = '__panel__';
 const _dnsCustom = '__custom__';
 
-Future<void> _change(Settings Function(Settings settings) change) =>
-    Store.instance.update(
-      (state) => state.copyWith(settings: change(state.settings)),
-    );
+Future<void> _change(Settings Function(Settings settings) change) => Store
+    .instance
+    .update((state) => state.copyWith(settings: change(state.settings)));
 
 Future<void> _pickDns(BuildContext context) async {
   final l10n = AppLocalizations.of(context);
@@ -132,24 +136,64 @@ Future<void> _pickPingProfile(BuildContext context) async {
 }
 
 String _pingProfileKey(PingProfile profile) => switch (profile) {
-      PingProfile.single => 'pingProfileSingle',
-      PingProfile.double => 'pingProfileDouble',
-      PingProfile.keepAlive => 'pingProfileKeepAlive',
-    };
+  PingProfile.single => 'pingProfileSingle',
+  PingProfile.double => 'pingProfileDouble',
+  PingProfile.keepAlive => 'pingProfileKeepAlive',
+};
 
 String _logLevelKey(XrayLogLevel level) => switch (level) {
-      XrayLogLevel.debug => 'logLevelDebug',
-      XrayLogLevel.info => 'logLevelInfo',
-      XrayLogLevel.warning => 'logLevelWarning',
-      XrayLogLevel.error => 'logLevelError',
-      XrayLogLevel.none => 'logLevelNone',
-    };
+  XrayLogLevel.debug => 'logLevelDebug',
+  XrayLogLevel.info => 'logLevelInfo',
+  XrayLogLevel.warning => 'logLevelWarning',
+  XrayLogLevel.error => 'logLevelError',
+  XrayLogLevel.none => 'logLevelNone',
+};
 
 String _routingKey(RoutingMode mode) => switch (mode) {
-      RoutingMode.all => 'routingAll',
-      RoutingMode.onlySelected => 'routingOnly',
-      RoutingMode.bypassSelected => 'routingBypass',
-    };
+  RoutingMode.all => 'routingAll',
+  RoutingMode.onlySelected => 'routingOnly',
+  RoutingMode.bypassSelected => 'routingBypass',
+};
+
+String _tunnelModeKey(TunnelMode mode) => switch (mode) {
+  TunnelMode.tun => 'tunnelModeTun',
+  TunnelMode.tunProxy => 'tunnelModeTunProxy',
+  TunnelMode.proxy => 'tunnelModeProxy',
+};
+
+Future<void> _editSocksPort(BuildContext context) async {
+  final l10n = AppLocalizations.of(context);
+  final current = Store.instance.state.value.settings.effectiveSocksPort;
+  final value = await promptText(
+    context,
+    title: l10n.tr('socksPort'),
+    hint: '1024–65535',
+    initial: '$current',
+    keyboardType: TextInputType.number,
+  );
+  final parsed = int.tryParse(value?.trim() ?? '');
+  if (parsed == null || parsed < 1024 || parsed > 65535) return;
+  await _change((s) => s.copyWith(socksPort: parsed));
+}
+
+Future<void> _editSocksText(
+  BuildContext context, {
+  required String title,
+  required String current,
+  required Settings Function(Settings settings, String value) save,
+  bool obscureText = false,
+}) async {
+  final value = await promptText(
+    context,
+    title: title,
+    hint: obscureText ? '' : current,
+    initial: current,
+    obscureText: obscureText,
+  );
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty || trimmed == current) return;
+  await _change((s) => save(s, trimmed));
+}
 
 Future<void> _editPingUrl(BuildContext context) async {
   final l10n = AppLocalizations.of(context);
@@ -198,6 +242,232 @@ Future<void> _editMtu(BuildContext context) async {
   );
 }
 
+Future<void> _editGeoUrl(BuildContext context, GeoAssetKind kind) async {
+  final l10n = AppLocalizations.of(context);
+  final settings = Store.instance.state.value.settings;
+  final current = GeoAssets.urlFor(kind, settings);
+  final value = await promptText(
+    context,
+    title: l10n.tr(
+      kind == GeoAssetKind.geoip ? 'geoAssetsGeoipUrl' : 'geoAssetsGeositeUrl',
+    ),
+    hint: l10n.fmt('geoAssetsDefaultHint', {'url': GeoAssets.defaultUrl(kind)}),
+    initial: current,
+    keyboardType: TextInputType.url,
+  );
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty || trimmed == current || !context.mounted) return;
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null || !['http', 'https'].contains(uri.scheme)) {
+    showMessage(context, l10n.tr('geoAssetsBadUrl'));
+    return;
+  }
+  await _change(
+    (s) => s.copyWith(
+      geoipUrl: kind == GeoAssetKind.geoip ? trimmed : null,
+      geositeUrl: kind == GeoAssetKind.geosite ? trimmed : null,
+    ),
+  );
+  await GeoAssets.refreshStatus();
+}
+
+Future<void> _downloadGeoAsset(BuildContext context, GeoAssetKind kind) async {
+  final l10n = AppLocalizations.of(context);
+  final proxyPort = Vpn.tunnelProxyPort;
+  AppLog.add(
+    'geo',
+    'обновление ${kind.fileName}: начало'
+        '${proxyPort > 0 ? ' (через туннель)' : ' (напрямую)'}',
+  );
+  try {
+    final changed = await GeoAssets.download(kind, proxyPort: proxyPort);
+    AppLog.add('geo', 'обновление ${kind.fileName}: успешно');
+    if (!context.mounted) return;
+    showMessage(context, l10n.fmt('geoAssetsUpdated', {'file': kind.fileName}));
+    if (changed) unawaited(GeoAssets.refreshStatus());
+  } on Object catch (e) {
+    AppLog.add('geo', 'обновление ${kind.fileName}: ошибка — $e');
+    if (!context.mounted) return;
+    showMessage(
+      context,
+      l10n.fmt('geoAssetsFailed', {'file': kind.fileName, 'error': '$e'}),
+    );
+  }
+}
+
+Future<void> _pickGeoAsset(BuildContext context, GeoAssetKind kind) async {
+  final l10n = AppLocalizations.of(context);
+  try {
+    final changed = await GeoAssets.pickAndImport(kind);
+    if (!changed || !context.mounted) return;
+    showMessage(context, l10n.fmt('geoAssetsUpdated', {'file': kind.fileName}));
+  } on Object catch (_) {
+    if (!context.mounted) return;
+    showMessage(context, l10n.tr('geoAssetsInvalid'));
+  }
+}
+
+String _geoStatusText(AppLocalizations l10n, GeoAssetInfo info) {
+  if (!info.exists) return l10n.tr('geoAssetsStatusMissing');
+  final date = info.updatedAt?.toLocal().toString().split('.').first ?? '';
+  return l10n.fmt('geoAssetsStatusReady', {'date': date});
+}
+
+/// Карточка geo-баз внутри раздела «Маршрутизация». Состояние файлов прочитано
+/// асинхронно, поэтому виджет сам обновляет его при открытии экрана.
+class _GeoAssetsTiles extends StatefulWidget {
+  const _GeoAssetsTiles();
+
+  @override
+  State<_GeoAssetsTiles> createState() => _GeoAssetsTilesState();
+}
+
+class _GeoAssetsTilesState extends State<_GeoAssetsTiles> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(GeoAssets.refreshStatus());
+  }
+
+  Widget _fileCard(
+    BuildContext context,
+    AppLocalizations l10n,
+    GeoAssetInfo info,
+    double? progress,
+  ) {
+    final downloading = progress != null;
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.storage_outlined),
+        title: Text(info.kind.fileName),
+        subtitle: downloading
+            ? Text(
+                progress > 0
+                    ? l10n.fmt('geoAssetsProgress', {
+                        'percent': '${(progress * 100).round()}',
+                      })
+                    : l10n.fmt('geoAssetsUpdating', {
+                        'file': info.kind.fileName,
+                      }),
+              )
+            : Text(_geoStatusText(l10n, info)),
+        trailing: downloading
+            ? SizedBox(
+                width: 112,
+                child: LinearProgressIndicator(
+                  value: progress > 0 ? progress : null,
+                ),
+              )
+            : IconButton(
+                tooltip: l10n.tr('geoAssetsDownload'),
+                icon: const Icon(Icons.download_outlined),
+                onPressed: () => _downloadGeoAsset(context, info.kind),
+              ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ValueListenableBuilder<AppState>(
+      valueListenable: Store.instance.state,
+      builder: (context, state, _) {
+        final settings = state.settings;
+        return ValueListenableBuilder<List<GeoAssetInfo>>(
+          valueListenable: GeoAssets.status,
+          builder: (context, saved, _) {
+            final infos = saved.isEmpty
+                ? GeoAssetKind.values
+                      .map(
+                        (kind) => GeoAssetInfo(
+                          kind: kind,
+                          url: GeoAssets.urlFor(kind, settings),
+                          exists: false,
+                          size: 0,
+                          updatedAt: GeoAssets.updatedAtFor(kind, settings),
+                        ),
+                      )
+                      .toList()
+                : saved;
+            return ValueListenableBuilder<Map<GeoAssetKind, double>>(
+              valueListenable: GeoAssets.progress,
+              builder: (context, progress, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final info in infos)
+                    _fileCard(context, l10n, info, progress[info.kind]),
+                  for (final kind in GeoAssetKind.values)
+                    ListTile(
+                      leading: const Icon(Icons.link),
+                      title: Text(
+                        l10n.tr(
+                          kind == GeoAssetKind.geoip
+                              ? 'geoAssetsGeoipUrl'
+                              : 'geoAssetsGeositeUrl',
+                        ),
+                      ),
+                      subtitle: Text(GeoAssets.urlFor(kind, settings)),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: () => _editGeoUrl(context, kind),
+                    ),
+                  for (final kind in GeoAssetKind.values)
+                    ListTile(
+                      leading: const Icon(Icons.folder_open_outlined),
+                      title: Text(
+                        l10n.fmt('geoAssetsChoose', {'file': kind.fileName}),
+                      ),
+                      onTap: () => _pickGeoAsset(context, kind),
+                    ),
+                  SwitchListTile(
+                    title: Text(l10n.tr('geoAssetsAutoUpdate')),
+                    value: settings.geoAssetsAutoUpdate,
+                    onChanged: (value) =>
+                        _change((s) => s.copyWith(geoAssetsAutoUpdate: value)),
+                  ),
+                  if (settings.geoAssetsAutoUpdate)
+                    SwitchListTile(
+                      title: Text(l10n.tr('geoAssetsWifiOnly')),
+                      value: settings.geoAssetsWifiOnly,
+                      onChanged: (value) =>
+                          _change((s) => s.copyWith(geoAssetsWifiOnly: value)),
+                    ),
+                  SwitchListTile(
+                    title: Text(l10n.tr('geoAssetsRestart')),
+                    value: settings.geoAssetsRestartXray,
+                    onChanged: (value) =>
+                        _change((s) => s.copyWith(geoAssetsRestartXray: value)),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.schedule),
+                    title: Text(l10n.tr('geoAssetsInterval')),
+                    subtitle: Text('${settings.geoAssetsUpdateHours}'),
+                    onTap: () => _editHours(
+                      context,
+                      title: l10n.tr('geoAssetsInterval'),
+                      current: settings.geoAssetsUpdateHours,
+                      min: Settings.minGeoAssetsUpdateHours,
+                      max: Settings.maxGeoAssetsUpdateHours,
+                      save: (hours) => _change(
+                        (s) => s.copyWith(geoAssetsUpdateHours: hours),
+                      ),
+                    ),
+                  ),
+                  if (settings.geoAssetsAutoUpdate &&
+                      settings.geoAssetsWifiOnly)
+                    _hint(context, l10n.tr('geoAssetsSkipMobile')),
+                  if (Vpn.status.value == VpnStatus.connected)
+                    _hint(context, l10n.tr('reconnectHint')),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 Future<void> _pickLogLevel(BuildContext context) async {
   final l10n = AppLocalizations.of(context);
   final current = Store.instance.state.value.settings.xrayLogLevel;
@@ -213,9 +483,7 @@ Future<void> _pickLogLevel(BuildContext context) async {
                 level == current
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
-                color: level == current
-                    ? curieAccent(Theme.of(context))
-                    : null,
+                color: level == current ? curieAccent(Theme.of(context)) : null,
               ),
               title: Text(l10n.tr(_logLevelKey(level))),
               onTap: () => Navigator.of(context).pop(level),
@@ -283,13 +551,13 @@ Widget _group(
 }
 
 Widget _hint(BuildContext context, String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
-    );
+  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+  child: Text(
+    text,
+    style: Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+  ),
+);
 
 class _Section {
   const _Section({
@@ -325,8 +593,8 @@ class SettingsScreen extends StatelessWidget {
             final languageKey = locale == null
                 ? 'languageSystem'
                 : locale.languageCode == 'ru'
-                    ? 'languageRussian'
-                    : 'languageEnglish';
+                ? 'languageRussian'
+                : 'languageEnglish';
             final sections = <_Section>[
               _Section(
                 icon: Icons.vpn_key_outlined,
@@ -359,6 +627,14 @@ class SettingsScreen extends StatelessWidget {
                 screen: const LogsSettingsScreen(),
               ),
               _Section(
+                icon: Icons.science_outlined,
+                title: l10n.tr('sectionExperimental'),
+                subtitle: settings.useRustCore
+                    ? l10n.tr('on')
+                    : l10n.tr('off'),
+                screen: const ExperimentalSettingsScreen(),
+              ),
+              _Section(
                 icon: Icons.info_outline,
                 title: l10n.tr('sectionAbout'),
                 subtitle: buildStamp,
@@ -377,9 +653,8 @@ class SettingsScreen extends StatelessWidget {
                   child: ListTile(
                     leading: CircleAvatar(
                       radius: 18,
-                      backgroundColor: curieAccent(theme).withValues(
-                        alpha: 0.12,
-                      ),
+                      backgroundColor: curieAccent(theme)
+                          .withValues(alpha: 0.12),
                       child: Icon(
                         section.icon,
                         color: curieAccent(theme),
@@ -390,9 +665,7 @@ class SettingsScreen extends StatelessWidget {
                     subtitle: Text(section.subtitle),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => section.screen,
-                      ),
+                      MaterialPageRoute<void>(builder: (_) => section.screen),
                     ),
                   ),
                 );
@@ -467,14 +740,20 @@ class RoutingSettingsScreen extends StatelessWidget {
                         onTap: settings.routingMode == RoutingMode.all
                             ? null
                             : () => Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => AppPickerScreen(
-                                      mode: settings.routingMode,
-                                    ),
+                                MaterialPageRoute<void>(
+                                  builder: (_) => AppPickerScreen(
+                                    mode: settings.routingMode,
                                   ),
                                 ),
+                              ),
                       ),
                   ],
+                ),
+                _group(
+                  context,
+                  icon: Icons.public_outlined,
+                  title: l10n.tr('sectionGeoAssets'),
+                  children: [_GeoAssetsTiles()],
                 ),
               ],
             );
@@ -499,11 +778,12 @@ class ConnectionSettingsScreen extends StatelessWidget {
           valueListenable: Store.instance.state,
           builder: (context, state, _) {
             final settings = state.settings;
-            final panelHours = state.subscriptions
-                .map((s) => s.updateIntervalHours)
-                .toSet()
-                .toList()
-              ..sort();
+            final panelHours =
+                state.subscriptions
+                    .map((s) => s.updateIntervalHours)
+                    .toSet()
+                    .toList()
+                  ..sort();
             final panelHint = panelHours.isEmpty
                 ? '—'
                 : panelHours.map((h) => '$h').join(', ');
@@ -595,14 +875,15 @@ class ConnectionSettingsScreen extends StatelessWidget {
                             value: settings.pingTimeoutSeconds.toDouble(),
                             min: Settings.minPingTimeout.toDouble(),
                             max: Settings.maxPingTimeout.toDouble(),
-                            divisions: Settings.maxPingTimeout -
+                            divisions:
+                                Settings.maxPingTimeout -
                                 Settings.minPingTimeout,
-                            label: '${settings.pingTimeoutSeconds} '
+                            label:
+                                '${settings.pingTimeoutSeconds} '
                                 '${l10n.tr('secondsShort')}',
                             onChanged: (value) => _change(
-                              (s) => s.copyWith(
-                                pingTimeoutSeconds: value.round(),
-                              ),
+                              (s) =>
+                                  s.copyWith(pingTimeoutSeconds: value.round()),
                             ),
                           ),
                           Row(
@@ -638,6 +919,79 @@ class ConnectionSettingsScreen extends StatelessWidget {
                         trailing: const Icon(Icons.edit_outlined),
                         onTap: () => _editPingUrl(context),
                       ),
+                  ],
+                ),
+                _group(
+                  context,
+                  icon: Icons.vpn_key_outlined,
+                  title: l10n.tr('tunnelMode'),
+                  children: [
+                    RadioGroup<TunnelMode>(
+                      groupValue: settings.tunnelMode,
+                      onChanged: (value) {
+                        if (value != null) {
+                          _change((s) => s.copyWith(tunnelMode: value));
+                        }
+                      },
+                      child: Column(
+                        children: [
+                          for (final mode in TunnelMode.values)
+                            RadioListTile<TunnelMode>(
+                              value: mode,
+                              title: Text(l10n.tr(_tunnelModeKey(mode))),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (settings.tunnelMode.hasProxy) ...[
+                      _hint(context, l10n.tr('tunnelModeHint')),
+                      ListTile(
+                        leading: const Icon(Icons.numbers),
+                        title: Text(l10n.tr('socksPort')),
+                        subtitle: Text('${settings.effectiveSocksPort}'),
+                        trailing: const Icon(Icons.edit_outlined),
+                        onTap: () => _editSocksPort(context),
+                      ),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.lock_outline),
+                        title: Text(l10n.tr('socksAuth')),
+                        value: settings.socksAuth,
+                        onChanged: (value) => _change(
+                          (s) => s.copyWith(socksAuth: value),
+                        ),
+                      ),
+                      if (settings.socksAuth) ...[
+                        ListTile(
+                          leading: const Icon(Icons.person_outline),
+                          title: Text(l10n.tr('socksUsername')),
+                          subtitle: Text(settings.socksUsername),
+                          trailing: const Icon(Icons.edit_outlined),
+                          onTap: () => _editSocksText(
+                            context,
+                            title: l10n.tr('socksUsername'),
+                            current: settings.socksUsername,
+                            save: (s, value) =>
+                                s.copyWith(socksUsername: value),
+                          ),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.password_outlined),
+                          title: Text(l10n.tr('socksPassword')),
+                          subtitle: Text('•' * 8),
+                          trailing: const Icon(Icons.edit_outlined),
+                          onTap: () => _editSocksText(
+                            context,
+                            title: l10n.tr('socksPassword'),
+                            current: settings.effectiveSocksPassword,
+                            obscureText: true,
+                            save: (s, value) =>
+                                s.copyWith(socksPassword: value),
+                          ),
+                        ),
+                      ],
+                    ],
+                    if (Vpn.status.value == VpnStatus.connected)
+                      _hint(context, l10n.tr('reconnectHint')),
                   ],
                 ),
                 _group(
@@ -734,9 +1088,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   builder: (context, locale, _) => RadioGroup<String>(
                     groupValue: locale?.languageCode ?? 'system',
                     onChanged: (value) => LocaleController.set(
-                      value == null || value == 'system'
-                          ? null
-                          : Locale(value),
+                      value == null || value == 'system' ? null : Locale(value),
                     ),
                     child: Column(
                       children: [
@@ -792,9 +1144,8 @@ class LogsSettingsScreen extends StatelessWidget {
                       title: Text(l10n.tr('xrayLogEnabled')),
                       subtitle: Text(l10n.tr('xrayLogEnabledHint')),
                       value: settings.xrayLogEnabled,
-                      onChanged: (value) => _change(
-                        (s) => s.copyWith(xrayLogEnabled: value),
-                      ),
+                      onChanged: (value) =>
+                          _change((s) => s.copyWith(xrayLogEnabled: value)),
                     ),
                     ListTile(
                       leading: const Icon(Icons.tune),
@@ -833,6 +1184,64 @@ class LogsSettingsScreen extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => const LogScreen(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Экспериментальные функции. По умолчанию всё выключено; переключатель
+/// сохранён в зашифрованном состоянии и влияет только на следующий коннект.
+class ExperimentalSettingsScreen extends StatelessWidget {
+  const ExperimentalSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.tr('sectionExperimental'))),
+      body: SafeArea(
+        child: ValueListenableBuilder<AppState>(
+          valueListenable: Store.instance.state,
+          builder: (context, state, _) {
+            final settings = state.settings;
+            return ListView(
+              children: [
+                _group(
+                  context,
+                  icon: Icons.science_outlined,
+                  title: l10n.tr('sectionExperimental'),
+                  children: [
+                    SwitchListTile(
+                      value: settings.useRustCore,
+                      title: Text(l10n.tr('useRustCore')),
+                      subtitle: Text(
+                        settings.useRustCore
+                            ? l10n.tr('on')
+                            : l10n.tr('off'),
+                      ),
+                      onChanged: (value) => _change(
+                        (settings) => settings.copyWith(useRustCore: value),
+                      ),
+                    ),
+                    _hint(context, l10n.tr('useRustCoreHint')),
+                    FutureBuilder<String>(
+                      future: coreVersion(),
+                      builder: (context, snapshot) => ListTile(
+                        leading: const Icon(Icons.memory),
+                        title: Text(l10n.tr('coreVersion')),
+                        subtitle: Text(
+                          coreLabel(
+                            snapshot.data ?? libXrayVersion,
+                          ),
                         ),
                       ),
                     ),
@@ -931,45 +1340,54 @@ class _AboutTilesState extends State<_AboutTiles> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.system_update_alt_outlined),
-          title: Text(l10n.tr('checkUpdates')),
-          subtitle: Text(
-            l10n.fmt('updateCurrent', {
-              'version': _appVersion.isEmpty ? '—' : _appVersion,
-            }),
-          ),
-          trailing: _checkingUpdate
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : null,
-          onTap: _checkingUpdate ? null : _checkUpdates,
-        ),
-        ListTile(
-          leading: const Icon(Icons.memory),
-          title: Text(l10n.tr('coreVersion')),
-          subtitle: Text(libXrayVersion),
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: Text(l10n.tr('licenses')),
-          subtitle: const Text(
-            'Curie — Curie Source-Available License 1.0 · libXray — MIT · '
-            'Xray-core — MPL-2.0 · Flutter — BSD-3',
-          ),
-          onTap: () => showLicensePage(
-            context: context,
-            applicationName: 'Curie',
-            applicationVersion: _appVersion,
-            applicationLegalese: l10n.tr('licenseLegalese'),
-          ),
-        ),
-      ],
+    return ValueListenableBuilder<AppState>(
+      valueListenable: Store.instance.state,
+      builder: (context, _, _) {
+        return Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.system_update_alt_outlined),
+              title: Text(l10n.tr('checkUpdates')),
+              subtitle: Text(
+                l10n.fmt('updateCurrent', {
+                  'version': _appVersion.isEmpty ? '—' : _appVersion,
+                }),
+              ),
+              trailing: _checkingUpdate
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              onTap: _checkingUpdate ? null : _checkUpdates,
+            ),
+            FutureBuilder<String>(
+              future: coreVersion(),
+              builder: (context, snapshot) => ListTile(
+                leading: const Icon(Icons.memory),
+                title: Text(l10n.tr('coreVersion')),
+                subtitle: Text(coreLabel(snapshot.data ?? libXrayVersion)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(l10n.tr('licenses')),
+              subtitle: const Text(
+                'Curie — Curie Source-Available License 1.0 · libXray — MIT · '
+                'Xray-core — MPL-2.0 · xray-rust-mobile — MPL-2.0 · '
+                'Flutter — BSD-3',
+              ),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'Curie',
+                applicationVersion: _appVersion,
+                applicationLegalese: l10n.tr('licenseLegalese'),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

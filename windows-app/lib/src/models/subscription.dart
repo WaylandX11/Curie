@@ -19,7 +19,8 @@ class SubscriptionInfo {
 
   int get used => upload + download;
 
-  double? get usageRatio => total <= 0 ? null : (used / total).clamp(0, 1).toDouble();
+  double? get usageRatio =>
+      total <= 0 ? null : (used / total).clamp(0, 1).toDouble();
 
   bool get isExpired => expire != null && expire!.isBefore(DateTime.now());
 
@@ -47,19 +48,22 @@ class SubscriptionInfo {
   }
 
   Map<String, dynamic> toJson() => {
-        'upload': upload,
-        'download': download,
-        'total': total,
-        if (expire != null) 'expire': expire!.millisecondsSinceEpoch,
-      };
+    'upload': upload,
+    'download': download,
+    'total': total,
+    if (expire != null) 'expire': expire!.millisecondsSinceEpoch,
+  };
 
-  factory SubscriptionInfo.fromJson(Map<String, dynamic> json) => SubscriptionInfo(
+  factory SubscriptionInfo.fromJson(Map<String, dynamic> json) =>
+      SubscriptionInfo(
         upload: (json['upload'] as num?)?.toInt() ?? 0,
         download: (json['download'] as num?)?.toInt() ?? 0,
         total: (json['total'] as num?)?.toInt() ?? 0,
         expire: json['expire'] == null
             ? null
-            : DateTime.fromMillisecondsSinceEpoch((json['expire'] as num).toInt()),
+            : DateTime.fromMillisecondsSinceEpoch(
+                (json['expire'] as num).toInt(),
+              ),
       );
 }
 
@@ -90,6 +94,7 @@ class Subscription {
     this.lastErrorDetail,
     this.edits = const {},
     this.expanded = false,
+    this.requiresGeoAssets = false,
   });
 
   final String url;
@@ -116,6 +121,10 @@ class Subscription {
   /// Развёрнутость списка узлов — состояние интерфейса, но оно живёт в
   /// зашифрованном хранилище и переживает перезапуск.
   final bool expanded;
+
+  /// В теле подписки есть правила `geoip:`/`geosite:`: без DAT-файлов Xray
+  /// не сможет их применить, поэтому приложение предлагает скачать базы.
+  final bool requiresGeoAssets;
 
   String get id => url;
 
@@ -147,7 +156,8 @@ class Subscription {
   Profile applyEdit(Profile node) {
     final saved = edits[node.id];
     if (saved == null) return node;
-    return Profile.fromJson(saved).copyWith(subscriptionUrl: node.subscriptionUrl);
+    return Profile.fromJson(saved)
+        .copyWith(subscriptionUrl: node.subscriptionUrl);
   }
 
   Subscription copyWith({
@@ -163,65 +173,72 @@ class Subscription {
     String? lastErrorDetail,
     Map<String, Map<String, dynamic>>? edits,
     bool? expanded,
+    bool? requiresGeoAssets,
     bool clearError = false,
-  }) =>
-      Subscription(
-        url: url,
-        title: title ?? this.title,
-        nodes: nodes ?? this.nodes,
-        updatedAt: updatedAt ?? this.updatedAt,
-        updateIntervalHours: updateIntervalHours ?? this.updateIntervalHours,
-        info: info ?? this.info,
-        announce: announce ?? this.announce,
-        supportUrl: supportUrl ?? this.supportUrl,
-        webPageUrl: webPageUrl ?? this.webPageUrl,
-        lastError: clearError ? null : (lastError ?? this.lastError),
-        lastErrorDetail: clearError ? null : (lastErrorDetail ?? this.lastErrorDetail),
-        edits: edits ?? this.edits,
-        expanded: expanded ?? this.expanded,
-      );
+  }) => Subscription(
+    url: url,
+    title: title ?? this.title,
+    nodes: nodes ?? this.nodes,
+    updatedAt: updatedAt ?? this.updatedAt,
+    updateIntervalHours: updateIntervalHours ?? this.updateIntervalHours,
+    info: info ?? this.info,
+    announce: announce ?? this.announce,
+    supportUrl: supportUrl ?? this.supportUrl,
+    webPageUrl: webPageUrl ?? this.webPageUrl,
+    lastError: clearError ? null : (lastError ?? this.lastError),
+    lastErrorDetail: clearError
+        ? null
+        : (lastErrorDetail ?? this.lastErrorDetail),
+    edits: edits ?? this.edits,
+    expanded: expanded ?? this.expanded,
+    requiresGeoAssets: requiresGeoAssets ?? this.requiresGeoAssets,
+  );
 
   Map<String, dynamic> toJson() => {
-        'url': url,
-        'title': title,
-        'nodes': nodes.map((n) => n.toJson()).toList(),
-        if (updatedAt != null) 'updatedAt': updatedAt!.millisecondsSinceEpoch,
-        'updateIntervalHours': updateIntervalHours,
-        if (info != null) 'info': info!.toJson(),
-        if (announce != null) 'announce': announce,
-        if (supportUrl != null) 'supportUrl': supportUrl,
-        if (webPageUrl != null) 'webPageUrl': webPageUrl,
-        if (lastError != null) 'lastError': lastError,
-        if (lastErrorDetail != null) 'lastErrorDetail': lastErrorDetail,
-        if (edits.isNotEmpty)
-          'edits': edits.map((key, value) => MapEntry(key, value)),
-        'expanded': expanded,
-      };
+    'url': url,
+    'title': title,
+    'nodes': nodes.map((n) => n.toJson()).toList(),
+    if (updatedAt != null) 'updatedAt': updatedAt!.millisecondsSinceEpoch,
+    'updateIntervalHours': updateIntervalHours,
+    if (info != null) 'info': info!.toJson(),
+    if (announce != null) 'announce': announce,
+    if (supportUrl != null) 'supportUrl': supportUrl,
+    if (webPageUrl != null) 'webPageUrl': webPageUrl,
+    if (lastError != null) 'lastError': lastError,
+    if (lastErrorDetail != null) 'lastErrorDetail': lastErrorDetail,
+    if (edits.isNotEmpty)
+      'edits': edits.map((key, value) => MapEntry(key, value)),
+    'expanded': expanded,
+    'requiresGeoAssets': requiresGeoAssets,
+  };
 
   factory Subscription.fromJson(Map<String, dynamic> json) => Subscription(
-        url: json['url'] as String,
-        title: (json['title'] as String?) ?? '',
-        nodes: ((json['nodes'] as List?) ?? const [])
-            .map((e) => Profile.fromJson((e as Map).cast<String, dynamic>()))
-            .toList(),
-        updatedAt: json['updatedAt'] == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch((json['updatedAt'] as num).toInt()),
-        updateIntervalHours: (json['updateIntervalHours'] as num?)?.toInt() ?? 12,
-        info: json['info'] == null
-            ? null
-            : SubscriptionInfo.fromJson((json['info'] as Map).cast<String, dynamic>()),
-        announce: json['announce'] as String?,
-        supportUrl: json['supportUrl'] as String?,
-        webPageUrl: json['webPageUrl'] as String?,
-        lastError: json['lastError'] as String?,
-        lastErrorDetail: json['lastErrorDetail'] as String?,
-        edits: ((json['edits'] as Map?) ?? const {}).map(
-          (key, value) => MapEntry(
-            key.toString(),
-            (value as Map).cast<String, dynamic>(),
+    url: json['url'] as String,
+    title: (json['title'] as String?) ?? '',
+    nodes: ((json['nodes'] as List?) ?? const [])
+        .map((e) => Profile.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(),
+    updatedAt: json['updatedAt'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(
+            (json['updatedAt'] as num).toInt(),
           ),
-        ),
-        expanded: (json['expanded'] as bool?) ?? false,
-      );
+    updateIntervalHours: (json['updateIntervalHours'] as num?)?.toInt() ?? 12,
+    info: json['info'] == null
+        ? null
+        : SubscriptionInfo.fromJson(
+            (json['info'] as Map).cast<String, dynamic>(),
+          ),
+    announce: json['announce'] as String?,
+    supportUrl: json['supportUrl'] as String?,
+    webPageUrl: json['webPageUrl'] as String?,
+    lastError: json['lastError'] as String?,
+    lastErrorDetail: json['lastErrorDetail'] as String?,
+    edits: ((json['edits'] as Map?) ?? const {}).map(
+      (key, value) =>
+          MapEntry(key.toString(), (value as Map).cast<String, dynamic>()),
+    ),
+    expanded: (json['expanded'] as bool?) ?? false,
+    requiresGeoAssets: (json['requiresGeoAssets'] as bool?) ?? false,
+  );
 }

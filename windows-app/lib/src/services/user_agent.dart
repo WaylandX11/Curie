@@ -20,8 +20,10 @@ String formatUserAgent({
       .replaceAll(RegExp(r'\s+'), '');
   // И версия ядра из libXray, и ответ xrayVersion могут прийти с префиксом v.
   // В заголовке оставляем только цифры: Curie/…/26.11.9/…, а не /v26.11.9/…
-  final xray = (core.isEmpty ? libXrayVersion : core)
-      .replaceFirst(RegExp(r'^v(?=\d)', caseSensitive: false), '');
+  final xray = (core.isEmpty ? libXrayVersion : core).replaceFirst(
+    RegExp(r'^v(?=\d)', caseSensitive: false),
+    '',
+  );
   final os = (platform ?? Platform.operatingSystem).trim();
   return ['Curie', app, xray, os].where((part) => part.isNotEmpty).join('/');
 }
@@ -41,11 +43,14 @@ Future<String> currentUserAgent({
     xrayVersion: await xray.version(),
     platform: os,
   );
-  if (!_logged) {
-    _logged = true;
+  // Заголовок пишется один раз для каждого значения: после смены версии ядра
+  // новый заголовок тоже должен появиться в журнале.
+  if (_loggedHeader != header &&
+      !AppLog.contains('app', 'User-Agent: $header')) {
+    _loggedHeader = header;
     AppLog.add('app', 'User-Agent: $header');
   }
   return header;
 }
 
-bool _logged = false;
+String? _loggedHeader;

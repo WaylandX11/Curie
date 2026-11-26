@@ -7,12 +7,16 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -42,6 +46,9 @@ class CurieVpnService : VpnService() {
         const val ACTION_CONNECT = "io.github.waylandx11.curie.CONNECT"
         const val ACTION_DISCONNECT = "io.github.waylandx11.curie.DISCONNECT"
         const val EXTRA_CONFIG = "config"
+        const val EXTRA_TUNNEL_MODE = "tunnelMode"
+        const val EXTRA_USE_RUST_CORE = "useRustCore"
+        const val EXTRA_GEO_DIR = "geoDir"
         const val EXTRA_DNS = "dns"
         const val EXTRA_MTU = "mtu"
         const val EXTRA_MODE = "mode"
@@ -55,13 +62,21 @@ class CurieVpnService : VpnService() {
         private const val KEY_ALIAS = "curie_vpn_session_key"
         private const val KEY_DNS = "dns"
         private const val KEY_MTU = "mtu"
+        private const val KEY_TUNNEL_MODE = "tunnelMode"
         private const val KEY_MODE = "mode"
         private const val KEY_ALLOWED = "allowed"
         private const val KEY_BYPASSED = "bypassed"
         private const val WATCHDOG_MS = 30_000L
         private const val PROBE_TIMEOUT_MS = 8_000
-        private const val PROBE_URL = "http://www.gstatic.com/generate_204"
+        // Тот же адрес, что и у Dart-проверки (ConnectionCheck.probeUrl).
+        // gstatic часто недоступен с выходов в RU, из-за чего сторож
+        // перезапускал ядро, хотя кнопка «Проверить» показывала зелёный.
+        private const val PROBE_URL = "https://cp.cloudflare.com/generate_204"
         private const val RESTART_AFTER_FAILURES = 2
+        // После смены сети балансировщику нужно время, чтобы исключить мёртвый
+        // узел (интервал observatory — 30 с). В этот период не перезапускаем
+        // ядро: это не поломка туннеля, а переходный период.
+        private const val NETWORK_GRACE_MS = 90_000L
 
         fun start(context: Context, intent: Intent) {
             val service = Intent(intent).setClass(context, CurieVpnService::class.java)
@@ -83,6 +98,7 @@ class CurieVpnService : VpnService() {
         val config: String,
         val dns: String,
         val mtu: Int,
+        val tunnelMode: String,
         val mode: String,
         val allowed: Set<String>,
         val bypassed: Set<String>
@@ -94,6 +110,11 @@ class CurieVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var sessionConfig: String? = null
     private var failures = 0
+    private var currentDns = "77.88.8.8"
+    private var currentTunnelMode = "tun"
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var lastNetworkChangeMs = 0L
+    private var directInternetNotified = false
 
     // Номер последней команды: задача из очереди не меняет состояние, если
     // пока она ждала, пришла новая команда (например, смена узла).
@@ -101,6 +122,7 @@ class CurieVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
+        CurieBridge.setCore("xray")
         createChannel()
     }
 
@@ -117,6 +139,7 @@ class CurieVpnService : VpnService() {
                     config = config,
                     dns = intent.getStringExtra(EXTRA_DNS) ?: "77.88.8.8",
                     mtu = intent.getIntExtra(EXTRA_MTU, 1500),
+                    tunnelMode = intent.getStringExtra(EXTRA_TUNNEL_MODE) ?: "tun",
                     mode = intent.getStringExtra(EXTRA_MODE) ?: "all",
                     allowed = (intent.getStringArrayListExtra(EXTRA_ALLOWED) ?: arrayListOf()).toSet(),
                     bypassed = (intent.getStringArrayListExtra(EXTRA_BYPASSED) ?: arrayListOf()).toSet()
@@ -160,46 +183,58 @@ class CurieVpnService : VpnService() {
             teardown()
             if (id != generation.get()) return
 
-            val builder = Builder()
-                .setSession("Curie")
-                .setMtu(session.mtu)
-                .addAddress("172.19.0.1", 30)
-                .addAddress("fdfe:dcba:9876::1", 126)
-                .addDnsServer(session.dns)
-                .addRoute("0.0.0.0", 0)
-                .addRoute("::", 0)
+            val useTun = session.tunnelMode != "proxy"
+            currentTunnelMode = session.tunnelMode
+            var fd: ParcelFileDescriptor? = null
+            if (useTun) {
+                val builder = Builder()
+                    .setSession("Curie")
+                    .setMtu(session.mtu)
+                    .addAddress("172.19.0.1", 30)
+                    .addAddress("fdfe:dcba:9876::1", 126)
+                    .addDnsServer(session.dns)
+                    .addRoute("0.0.0.0", 0)
+                    .addRoute("::", 0)
 
-            applyAppRouting(builder, session.mode, session.allowed.toList(), session.bypassed.toList())
+                applyAppRouting(
+                    builder,
+                    session.mode,
+                    session.allowed.toList(),
+                    session.bypassed.toList()
+                )
 
-            val fd = builder.establish()
-            if (fd == null) {
-                CurieBridge.log("establish() вернул null — VPN не разрешён или занят другим приложением")
-                throw IllegalStateException("VpnService.establish() вернул null")
-            }
-            tun?.close()
-            tun = fd
-            if (id != generation.get()) {
-                // Пока ждали establish, пользователь уже выбрал другой узел.
-                runCatching { fd.close() }
-                tun = null
-                return
+                val established = builder.establish()
+                if (established == null) {
+                    CurieBridge.log("establish() вернул null — VPN не разрешён или занят другим приложением")
+                    throw IllegalStateException("VpnService.establish() вернул null")
+                }
+                tun?.close()
+                tun = established
+                if (id != generation.get()) {
+                    // Пока ждали establish, пользователь уже выбрал другой узел.
+                    runCatching { established.close() }
+                    tun = null
+                    return
+                }
+                fd = established
+                CurieBridge.log(
+                    "tun поднят: fd=${established.fd}, mtu=${session.mtu}, dns=${session.dns}, режим=${session.mode}"
+                )
+            } else {
+                CurieBridge.log("SOCKS5 режим: TUN не создаётся")
             }
             sessionConfig = session.config
-            CurieBridge.log(
-                "tun поднят: fd=${fd.fd}, mtu=${session.mtu}, dns=${session.dns}, режим=${session.mode}"
-            )
-
-            val controller = XrayBridge.controllerFor(this)
-            // Go-резолвер ядра: запросы уходят мимо туннеля, иначе сервер по имени
-            // не найти. Это оптимизация, а не условие запуска: сбой не роняет сессию.
-            runCatching { LibXray.setDNS(controller, "${session.dns}:53") }
-                .onFailure { CurieBridge.log("setDNS не удался: ${it.javaClass.simpleName}: ${it.message}") }
+            currentDns = session.dns
+            // Go-резолвер ядра нужен только с TUN: в SOCKS5-режиме сервер
+            // резолвится системой, а перед туннелем нет собственного DNS.
+            if (useTun) applyResolverDns()
 
             if (!startCore(session.config, fd)) return
             if (id != generation.get()) return
 
             val (metrics, check) = parsePorts(session.config)
             CurieBridge.setSession(metrics, check)
+            registerNetworkCallback()
             startWatchdog(check, id)
 
             updateNotification(getString(R.string.vpn_connected))
@@ -212,11 +247,13 @@ class CurieVpnService : VpnService() {
         }
     }
 
-    private fun startCore(config: String, fd: ParcelFileDescriptor): Boolean {
+    private fun startCore(config: String, fd: ParcelFileDescriptor?): Boolean {
         val json = JSONObject(config)
-        val env = json.optJSONObject("env") ?: JSONObject()
-        env.put("xray.tun.fd", fd.fd.toString())
-        json.put("env", env)
+        if (fd != null) {
+            val env = json.optJSONObject("env") ?: JSONObject()
+            env.put("xray.tun.fd", fd.fd.toString())
+            json.put("env", env)
+        }
 
         val response = XrayBridge.invoke(
             "runXray",
@@ -238,7 +275,7 @@ class CurieVpnService : VpnService() {
             override fun run() {
                 if (id != generation.get() ||
                     CurieBridge.status != CurieBridge.STATUS_CONNECTED ||
-                    tun == null
+                    (currentTunnelMode != "proxy" && tun == null)
                 ) {
                     stopWatchdog()
                     return
@@ -263,6 +300,15 @@ class CurieVpnService : VpnService() {
             failures = 0
             return
         }
+        if (lastNetworkChangeMs > 0 &&
+            SystemClock.elapsedRealtime() - lastNetworkChangeMs < NETWORK_GRACE_MS
+        ) {
+            // Балансировщик ещё не переписал результаты observatory. Проверки
+            // в этот момент врут, а перезапуск ядра ничего не исправит.
+            failures = 0
+            return
+        }
+        var detail = "нет ответа"
         val ok = runCatching {
             val connection = URL(PROBE_URL).openConnection(
                 Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
@@ -272,24 +318,40 @@ class CurieVpnService : VpnService() {
                 connection.readTimeout = PROBE_TIMEOUT_MS
                 connection.requestMethod = "GET"
                 connection.instanceFollowRedirects = false
-                connection.responseCode in 200..399
+                val code = connection.responseCode
+                detail = "HTTP $code"
+                code in 200..399
             } finally {
                 connection.disconnect()
             }
-        }.getOrDefault(false)
+        }.onFailure { detail = it.message?.take(160) ?: it.javaClass.simpleName }
+            .getOrDefault(false)
 
         if (ok) {
             failures = 0
+            directInternetNotified = false
             return
         }
+        // Проба через туннель упала. Но если телефон сам не видит интернет
+        // (метро, лифт, captive portal), перезапуск ядра ничего не исправит.
+        // Приложение исключено из VPN, поэтому прямой запрос идёт мимо туннеля.
+        if (!hasDirectInternet()) {
+            if (!directInternetNotified) {
+                CurieBridge.log("нет интернета на устройстве: сторож не перезапускает ядро")
+                directInternetNotified = true
+            }
+            failures = 0
+            return
+        }
+        directInternetNotified = false
         failures++
         if (failures < RESTART_AFTER_FAILURES) return
 
         val config = sessionConfig
         val fd = tun
-        if (config == null || fd == null) return
+        if (config == null || (currentTunnelMode != "proxy" && fd == null)) return
         failures = 0
-        CurieBridge.log("туннель не отвечает: перезапускаю ядро")
+        CurieBridge.log("туннель не отвечает ($PROBE_URL, $detail): перезапускаю ядро")
         runCatching { XrayBridge.invoke("stopXray", JSONObject()) }
         val error = runCatching { startCore(config, fd) }.exceptionOrNull()
         if (error != null) {
@@ -298,16 +360,88 @@ class CurieVpnService : VpnService() {
         }
     }
 
+    /** Смена Wi-Fi на мобильную сеть не должна выглядеть как поломка туннеля. */
+    private fun registerNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        unregisterNetworkCallback()
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = onNetworkChanged()
+            override fun onLost(network: Network) = onNetworkChanged()
+            override fun onLinkPropertiesChanged(
+                network: Network,
+                linkProperties: LinkProperties,
+            ) = onNetworkChanged()
+        }
+        runCatching { manager.registerNetworkCallback(request, callback) }
+            .onFailure {
+                CurieBridge.log("network callback недоступен: ${it.message}")
+            }
+        networkCallback = callback
+    }
+
+    private fun unregisterNetworkCallback() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        networkCallback?.let { runCatching { manager.unregisterNetworkCallback(it) } }
+        networkCallback = null
+    }
+
+    private fun onNetworkChanged() {
+        if (currentTunnelMode != "proxy" && tun == null) return
+        if (failures > 0) {
+            CurieBridge.log("сеть изменилась: сбрасываю проверки туннеля")
+        }
+        lastNetworkChangeMs = SystemClock.elapsedRealtime()
+        failures = 0
+        directInternetNotified = false
+        if (currentTunnelMode != "proxy") applyResolverDns()
+    }
+
+    private fun applyResolverDns() {
+        val controller = XrayBridge.controllerFor(this)
+        runCatching { LibXray.setDNS(controller, "$currentDns:53") }
+            .onFailure {
+                CurieBridge.log(
+                    "setDNS не удался: ${it.javaClass.simpleName}: ${it.message}",
+                )
+            }
+    }
+
     private fun hasUnderlyingNetwork(): Boolean {
         val manager = getSystemService(ConnectivityManager::class.java) ?: return true
         val networks = manager.allNetworks
-        if (networks.isEmpty()) return false
+        if (networks.isEmpty()) {
+            directInternetNotified = false
+            return false
+        }
         return networks.any { network ->
             val caps = manager.getNetworkCapabilities(network) ?: return@any false
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) &&
                 !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
         }
     }
+
+    /**
+     * Прямой GET мимо туннеля: Curie исключён из VPN, поэтому ответ показывает,
+     * есть ли интернет у устройства. Без него неудача пробы через туннель —
+     * не повод перезапускать ядро.
+     */
+    private fun hasDirectInternet(): Boolean = runCatching {
+        val connection = URL(PROBE_URL).openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = PROBE_TIMEOUT_MS
+            connection.readTimeout = PROBE_TIMEOUT_MS
+            connection.requestMethod = "GET"
+            connection.instanceFollowRedirects = false
+            connection.responseCode in 200..399
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrDefault(false)
 
     /**
      * Раздельное туннелирование. Смешивать allowed и disallowed нельзя —
@@ -377,12 +511,14 @@ class CurieVpnService : VpnService() {
 
     private fun teardown() {
         stopWatchdog()
+        unregisterNetworkCallback()
         runCatching { XrayBridge.invoke("stopXray", JSONObject()) }
         runCatching { LibXray.resetDNS() }
         runCatching { tun?.close() }
         tun = null
         sessionConfig = null
         failures = 0
+        directInternetNotified = false
         CurieBridge.clearSession()
     }
 
@@ -391,6 +527,7 @@ class CurieVpnService : VpnService() {
             .putString(KEY_CONFIG_ENC, encryptConfig(session.config))
             .putString(KEY_DNS, session.dns)
             .putInt(KEY_MTU, session.mtu)
+            .putString(KEY_TUNNEL_MODE, session.tunnelMode)
             .putString(KEY_MODE, session.mode)
             .putStringSet(KEY_ALLOWED, session.allowed)
             .putStringSet(KEY_BYPASSED, session.bypassed)
@@ -411,6 +548,7 @@ class CurieVpnService : VpnService() {
             config = config,
             dns = prefs.getString(KEY_DNS, null) ?: "77.88.8.8",
             mtu = prefs.getInt(KEY_MTU, 1500),
+            tunnelMode = prefs.getString(KEY_TUNNEL_MODE, null) ?: "tun",
             mode = prefs.getString(KEY_MODE, null) ?: "all",
             allowed = prefs.getStringSet(KEY_ALLOWED, emptySet()) ?: emptySet(),
             bypassed = prefs.getStringSet(KEY_BYPASSED, emptySet()) ?: emptySet()

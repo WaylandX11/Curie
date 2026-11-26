@@ -11,6 +11,7 @@ import '../services/connection.dart';
 import '../services/connection_check.dart';
 import '../services/core_log.dart';
 import '../services/country.dart';
+import '../services/geo_assets.dart';
 import '../services/ping.dart';
 import '../services/store.dart';
 import '../services/subscriptions.dart';
@@ -47,6 +48,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Duration _uptime = Duration.zero;
   bool _checking = false;
   CheckResult? _lastCheck;
+  int _geoRestartSeen = 0;
+  bool _restartingGeo = false;
 
   @override
   void initState() {
@@ -54,17 +57,25 @@ class _HomeScreenState extends State<HomeScreen> {
     _status = Vpn.status.value;
     Vpn.status.addListener(_onStatus);
     UpdateNotifier.coreDialog.addListener(_onCoreDialog);
+    GeoAssets.prompt.addListener(_onGeoPrompt);
+    GeoAssets.restartRequested.addListener(_onGeoRestart);
+    _geoRestartSeen = GeoAssets.restartRequested.value;
     _loadVersions();
     _syncTimer();
-    // Уведомление могло прийти до монтирования экрана (проверка запускается
-    // сразу после первого кадра приложения) — не теряем его.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onCoreDialog());
+    // Уведомления могли прийти до монтирования экрана — не теряем их.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _onCoreDialog();
+      _onGeoPrompt();
+      _onGeoRestart();
+    });
   }
 
   @override
   void dispose() {
     Vpn.status.removeListener(_onStatus);
     UpdateNotifier.coreDialog.removeListener(_onCoreDialog);
+    GeoAssets.prompt.removeListener(_onGeoPrompt);
+    GeoAssets.restartRequested.removeListener(_onGeoRestart);
     _ticker?.cancel();
     super.dispose();
   }
@@ -73,11 +84,76 @@ class _HomeScreenState extends State<HomeScreen> {
     final notice = UpdateNotifier.coreDialog.value;
     if (notice == null || !mounted) return;
     UpdateNotifier.dismissDialog();
-    showUpdateDialog(
-      context,
-      notice.release,
-      coreUpdated: notice.coreUpdated,
+    showUpdateDialog(context, notice.release, coreUpdated: notice.coreUpdated);
+  }
+
+  void _onGeoPrompt() {
+    if (!GeoAssets.prompt.value || !mounted) return;
+    GeoAssets.dismissPrompt();
+    final l10n = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.tr('geoAssetsNeededTitle')),
+        content: Text(l10n.tr('geoAssetsNeededBody')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.tr('geoAssetsLater')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              unawaited(_downloadGeoAssets());
+            },
+            child: Text(l10n.tr('geoAssetsDownloadAll')),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<void> _downloadGeoAssets() async {
+    final l10n = AppLocalizations.of(context);
+    final errors = await GeoAssets.downloadAll(proxyPort: Vpn.tunnelProxyPort);
+    if (!mounted) return;
+    final failed = errors.entries
+        .where((entry) => entry.value != null)
+        .map((entry) => '${entry.key.fileName}: ${entry.value}')
+        .toList();
+    if (failed.isEmpty) {
+      showMessage(context, l10n.tr('geoAssetsReady'));
+    } else {
+      showMessage(
+        context,
+        l10n.fmt('geoAssetsFailed', {
+          'file': 'geoip.dat / geosite.dat',
+          'error': failed.join('; '),
+        }),
+      );
+    }
+  }
+
+  void _onGeoRestart() {
+    final value = GeoAssets.restartRequested.value;
+    if (value <= _geoRestartSeen) return;
+    _geoRestartSeen = value;
+    if (!mounted || _busy || _restartingGeo) return;
+    final settings = Store.instance.state.value.settings;
+    final profile = Store.instance.state.value.selected;
+    if (!settings.geoAssetsRestartXray ||
+        profile == null ||
+        Vpn.status.value != VpnStatus.connected) {
+      return;
+    }
+    _restartingGeo = true;
+    unawaited(() async {
+      try {
+        await _connect(profile);
+      } finally {
+        _restartingGeo = false;
+      }
+    }());
   }
 
   Future<void> _loadVersions() async {
@@ -195,6 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Файл может быть ещё открыт старым ядром: чистим его только на старте
       // приложения, когда туннель гарантированно не работает.
       final logPath = await CoreLog.ensurePath();
+      final geoAssetDir = await GeoAssets.assetDirectory();
       _lastCheck = null;
       await Vpn.connect(
         config: buildXrayConfig(
@@ -204,6 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
           metricsPort: metricsPort,
           checkPort: checkPort,
           logPath: logPath,
+          geoAssetDir: geoAssetDir,
         ),
         settings: settings,
       );

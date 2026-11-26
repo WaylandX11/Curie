@@ -31,9 +31,8 @@ class Vpn {
   static bool get isSupported => Platform.isWindows;
 
   /// Порт для обновлений: 0, когда туннель не работает.
-  static int get tunnelProxyPort => status.value == VpnStatus.connected
-      ? outboundProxyPort.value
-      : 0;
+  static int get tunnelProxyPort =>
+      status.value == VpnStatus.connected ? outboundProxyPort.value : 0;
 
   static Future<void>? _ready;
 
@@ -80,7 +79,9 @@ class Vpn {
 
     // Сначала порты и время старта, затем статус: слушатели статуса
     // (TunnelMonitor и экран) должны сразу видеть готовую сессию.
-    outboundProxyPort.value = active ? (args['check'] as num?)?.toInt() ?? 0 : 0;
+    outboundProxyPort.value = active
+        ? (args['check'] as num?)?.toInt() ?? 0
+        : 0;
     metricsPort.value = active ? (args['metrics'] as num?)?.toInt() ?? 0 : 0;
     connectedAt.value = active && started != null && started > 0
         ? DateTime.fromMillisecondsSinceEpoch(started)
@@ -110,13 +111,16 @@ class Vpn {
         throw const VpnException(
           'xray_missing',
           'xray.exe не найден. Положите его рядом с Curie.exe '
-          'или задайте переменную CURIE_XRAY_EXE.',
+              'или задайте переменную CURIE_XRAY_EXE.',
         );
       }
 
       final decoder = jsonDecode(config);
       if (decoder is! Map) {
-        throw const VpnException('bad_config', 'конфиг Xray не является объектом');
+        throw const VpnException(
+          'bad_config',
+          'конфиг Xray не является объектом',
+        );
       }
       final reserved = <int>{
         _portFromMetrics(decoder['metrics']),
@@ -129,21 +133,21 @@ class Vpn {
         proxyPort: proxyPort,
       );
       _metricsPort = _portFromMetrics(adapted['metrics']);
-      _checkPort = _portFromInbounds(adapted['inbounds']) ?? 0;
+      // Порт проверки ищем по тегу: в режимах с SOCKS5 он не первый inbound.
+      _checkPort = portOfInbound(adapted['inbounds'], 'check');
 
       final temp = await Directory.systemTemp.createTemp('curie-xray-');
-      final configFile = File('${temp.path}${Platform.pathSeparator}config.json');
-      await configFile.writeAsString(
-        jsonEncode(adapted),
-        flush: true,
+      final configFile = File(
+        '${temp.path}${Platform.pathSeparator}config.json',
       );
+      await configFile.writeAsString(jsonEncode(adapted), flush: true);
       _configFile = configFile;
 
-      final process = await Process.start(
-        executable,
-        ['run', '-c', configFile.path],
-        workingDirectory: _dirOf(executable),
-      );
+      final process = await Process.start(executable, [
+        'run',
+        '-c',
+        configFile.path,
+      ], workingDirectory: _dirOf(executable));
       _process = process;
       _stdout = process.stdout
           .transform(utf8.decoder)
@@ -159,10 +163,7 @@ class Vpn {
         _cleanupProcess();
         if (status.value == VpnStatus.connected ||
             status.value == VpnStatus.connecting) {
-          _apply({
-            'status': 'error',
-            'error': 'Xray завершился с кодом $code',
-          });
+          _apply({'status': 'error', 'error': 'Xray завершился с кодом $code'});
         }
         unawaited(WindowsSystemProxy.restore());
       });
@@ -180,10 +181,13 @@ class Vpn {
         'metrics': _metricsPort,
         'connectedAt': _startedAt!.millisecondsSinceEpoch,
       });
+      // На Windows нет TUN-драйвера: все режимы заканчиваются системным
+      // прокси, а SOCKS5 поднимается дополнительно, когда он выбран.
       AppLog.add(
         'vpn',
         'туннель поднят: proxy=$proxyPort check=$_checkPort metrics=$_metricsPort '
-        'режим=${settings.routingMode.wireName}',
+            'туннель=${settings.tunnelMode.wireName} '
+            'режим=${settings.routingMode.wireName}',
       );
     } on VpnException {
       await _failStart();
@@ -282,7 +286,8 @@ class Vpn {
     required int proxyPort,
   }) {
     final adapted = Map<String, dynamic>.from(config);
-    final inbounds = (config['inbounds'] as List?)
+    final inbounds =
+        (config['inbounds'] as List?)
             ?.whereType<Map>()
             .map((e) => e.cast<String, dynamic>())
             .toList() ??
@@ -301,7 +306,8 @@ class Vpn {
             'udp': true,
             'userLevel': 0,
           },
-          'sniffing': inbound['sniffing'] ??
+          'sniffing':
+              inbound['sniffing'] ??
               <String, dynamic>{
                 'enabled': true,
                 'destOverride': ['http', 'tls', 'quic'],
@@ -326,23 +332,35 @@ class Vpn {
       });
     }
     adapted['inbounds'] = result;
-    adapted.remove('env');
+    // Каталог geoip.dat/geosite.dat должен дойти до ядра; убираем только
+    // Android-дескриптор TUN, которого на Windows нет.
+    final env =
+        (config['env'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+    env.remove('xray.tun.fd');
+    if (env.isEmpty) {
+      adapted.remove('env');
+    } else {
+      adapted['env'] = env;
+    }
 
-    final routing = (config['routing'] as Map?)?.cast<String, dynamic>() ??
+    final routing =
+        (config['routing'] as Map?)?.cast<String, dynamic>() ??
         <String, dynamic>{};
-    final rules = (routing['rules'] as List?)
+    final rules =
+        (routing['rules'] as List?)
             ?.whereType<Map>()
             .map((e) => e.cast<String, dynamic>())
             .map((rule) {
-          final tags = rule['inboundTag'];
-          if (tags is List && tags.contains('tun')) {
-            return <String, dynamic>{
-              ...rule,
-              'inboundTag': ['proxy'],
-            };
-          }
-          return rule;
-        }).toList() ??
+              final tags = rule['inboundTag'];
+              if (tags is List && tags.contains('tun')) {
+                return <String, dynamic>{
+                  ...rule,
+                  'inboundTag': ['proxy'],
+                };
+              }
+              return rule;
+            })
+            .toList() ??
         <Map<String, dynamic>>[];
     adapted['routing'] = <String, dynamic>{...routing, 'rules': rules};
     return adapted;
@@ -373,23 +391,23 @@ class Vpn {
     return ports;
   }
 
+  /// Порт локального HTTP-прокси для проверок и фоновых запросов.
+  static int portOfInbound(Object? inbounds, String tag) {
+    if (inbounds is! List) return 0;
+    for (final item in inbounds) {
+      if (item is! Map) continue;
+      final inbound = item.cast<String, dynamic>();
+      if (inbound['tag'] != tag) continue;
+      return (inbound['port'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
   static int _portFromMetrics(Object? metrics) {
     final map = (metrics as Map?)?.cast<String, dynamic>();
     final listen = (map?['listen'] as String?) ?? '';
     final match = RegExp(r':(\d+)$').firstMatch(listen);
     return match != null ? int.tryParse(match.group(1)!) ?? 0 : 0;
-  }
-
-  static int? _portFromInbounds(Object? inbounds) {
-    if (inbounds is! List) return null;
-    for (final item in inbounds) {
-      if (item is! Map) continue;
-      final map = item.cast<String, dynamic>();
-      if (map['tag'] == 'check') {
-        return (map['port'] as num?)?.toInt();
-      }
-    }
-    return null;
   }
 
   static String _dirOf(String filePath) {
@@ -399,12 +417,12 @@ class Vpn {
   }
 
   static VpnStatus _statusFromName(String? name) => switch (name) {
-        'connecting' => VpnStatus.connecting,
-        'connected' => VpnStatus.connected,
-        'disconnecting' => VpnStatus.disconnecting,
-        'error' => VpnStatus.error,
-        _ => VpnStatus.disconnected,
-      };
+    'connecting' => VpnStatus.connecting,
+    'connected' => VpnStatus.connected,
+    'disconnecting' => VpnStatus.disconnecting,
+    'error' => VpnStatus.error,
+    _ => VpnStatus.disconnected,
+  };
 }
 
 class VpnException implements Exception {
