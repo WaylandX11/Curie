@@ -27,7 +27,7 @@ void main() {
   test('DNS comes from the subscription by default', () {
     const settings = Settings();
     expect(settings.dnsUsePanel, isTrue);
-    expect(settings.dns, '77.88.8.8', reason: 'адрес на случай пустой подписки');
+    expect(settings.dns, '8.8.8.8', reason: 'адрес на случай пустой подписки');
   });
 
   test('old DNS default migrates once, a custom address is kept', () {
@@ -38,7 +38,7 @@ void main() {
     expect(oldDefault.dnsUsePanel, isTrue);
 
     final legacy = Settings.fromJson({'dns': '1.1.1.1', 'dnsUsePanel': false});
-    expect(legacy.dns, '77.88.8.8');
+    expect(legacy.dns, '8.8.8.8');
     expect(legacy.dnsUsePanel, isTrue);
 
     final custom = Settings.fromJson({'dns': '9.9.9.9', 'dnsUsePanel': false});

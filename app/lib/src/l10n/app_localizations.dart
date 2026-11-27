@@ -55,10 +55,16 @@ class AppLocalizations {
 
     // подписки
     'subscriptions': 'Subscriptions',
+    'chooseSubscription': 'Choose subscription',
+    'manageSubscriptions': 'Manage subscriptions',
+    'displayMode': 'Display',
+    'displayPager': 'Swipe',
+    'displayList': 'List',
     'addSubscription': 'Add subscription',
     'subscriptionUrl': 'Subscription URL',
     'subscriptionName': 'Name (optional)',
     'subscriptionAdded': 'Subscription added',
+    'subscriptionAlreadyAdded': 'This subscription is already added',
     'subscriptionUpdated': 'Subscription updated',
     'update': 'Update',
     'updateAll': 'Update all',
@@ -157,6 +163,7 @@ class AppLocalizations {
     'about': 'About',
     'appVersion': 'App version',
     'coreVersion': 'Core version',
+    'rustCoreVersion': 'Rust core version',
     'licenses': 'Licenses',
     'licenseLegalese':
         'Curie code: Curie Source-Available License 1.0. Third-party '
@@ -308,10 +315,16 @@ class AppLocalizations {
     'noServersFound': 'Ничего не найдено',
 
     'subscriptions': 'Подписки',
+    'chooseSubscription': 'Выбрать подписку',
+    'manageSubscriptions': 'Управление подписками',
+    'displayMode': 'Вид',
+    'displayPager': 'Листание',
+    'displayList': 'Список',
     'addSubscription': 'Добавить подписку',
     'subscriptionUrl': 'Ссылка подписки',
     'subscriptionName': 'Название (необязательно)',
     'subscriptionAdded': 'Подписка добавлена',
+    'subscriptionAlreadyAdded': 'Эта подписка уже добавлена',
     'subscriptionUpdated': 'Подписка обновлена',
     'update': 'Обновить',
     'updateAll': 'Обновить все',
@@ -408,6 +421,7 @@ class AppLocalizations {
     'about': 'О приложении',
     'appVersion': 'Версия приложения',
     'coreVersion': 'Версия ядра',
+    'rustCoreVersion': 'Версия Rust-ядра',
     'licenses': 'Лицензии',
     'licenseLegalese':
         'Код Curie — Curie Source-Available License 1.0. Сторонние '

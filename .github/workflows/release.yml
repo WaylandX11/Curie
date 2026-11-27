@@ -49,6 +49,13 @@ jobs:
           version=$(python3 -c "import json;print(json.load(open('core.lock.json', encoding='utf-8-sig'))['version'])")
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Expose Rust core version for release notes
+        id: rust
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import re;print(re.search(r'xray-rust-mobile:([0-9][0-9A-Za-z.+-]*)', open('app/android/app/build.gradle.kts', encoding='utf-8').read()).group(1))")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       # NDK не нужен: libXray.aar содержит готовые .so, своего нативного кода нет.
 
       - name: Analyze and test
@@ -93,6 +100,7 @@ jobs:
           body: |
             Xray-core: ${{ steps.core.outputs.version }}
             libXray: ${{ steps.core.outputs.version }}
+            xray-rust: ${{ steps.rust.outputs.version }}
           files: |
             curie-*.apk
             curie-*.apk.sha256

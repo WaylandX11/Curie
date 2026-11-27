@@ -194,7 +194,7 @@ void main() {
 
   test('without a subscription DNS the fallback address is used', () {
     final servers = (build()['dns'] as Map)['servers'] as List;
-    expect((servers.first as Map)['address'], '77.88.8.8');
+    expect((servers.first as Map)['address'], '8.8.8.8');
     expect((servers.first as Map)['tag'], 'proxy');
     expect((servers.last as Map)['address'], '8.8.8.8');
   });
@@ -535,6 +535,119 @@ void main() {
       buildXrayConfig(outbounds: [serverOutbound]),
     ) as Map<String, dynamic>;
     expect((noPath['log'] as Map)['error'], 'none');
+  });
+
+  test('Rust config uses native balancer failover instead of a pinned outbound', () {
+    final rust = jsonDecode(
+      adaptConfigForRust(
+        buildXrayConfig(
+          outbounds: [fallbackOutbound, primaryOutbound],
+          checkPort: 49101,
+        ),
+      ),
+    ) as Map<String, dynamic>;
+
+    expect(rust.containsKey('burstObservatory'), isFalse);
+    expect(rust.containsKey('metrics'), isFalse);
+    expect(rust.containsKey('stats'), isFalse);
+    expect(rust.containsKey('policy'), isFalse);
+    expect(rust.containsKey('env'), isFalse);
+
+    final routing = rust['routing'] as Map<String, dynamic>;
+    final balancers = (routing['balancers'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(balancers.single['selector'], ['proxy-2']);
+    expect(balancers.single['fallbackTag'], 'proxy');
+    expect((balancers.single['strategy'] as Map)['type'], 'leastLoad');
+    expect((balancers.single['strategy'] as Map)['settings'], isEmpty);
+
+    final rules = (routing['rules'] as List).cast<Map<String, dynamic>>();
+    expect(rules.first['inboundTag'], ['check']);
+    expect(rules.first['balancerTag'], 'curie-auto-balancer');
+    expect(rules.first.containsKey('outboundTag'), isFalse);
+
+    final observatory = rust['observatory'] as Map<String, dynamic>;
+    expect(observatory['subjectSelector'], ['proxy-2']);
+    expect(observatory['probeURL'], 'https://cp.cloudflare.com/generate_204');
+    expect(observatory['probeInterval'], '30s');
+    expect(observatory['enableConcurrency'], isTrue);
+  });
+
+  test('Rust config preserves panel balancer rules and uses a reliable probe', () {
+    final base = {
+      'domainMatcher': 'hybrid',
+      'observatory': {'subjectSelector': ['proxy']},
+      'burstObservatory': {
+        'subjectSelector': ['proxy'],
+        'pingConfig': {
+          'destination': 'https://example.com/generate_204',
+          'interval': '20s',
+          'timeout': '4s',
+          'sampling': 2,
+        },
+      },
+      'routing': {
+        'rules': [
+          {
+            'type': 'field',
+            'network': 'tcp,udp',
+            'balancerTag': 'balance',
+          },
+        ],
+        'balancers': [
+          {
+            'tag': 'balance',
+            'selector': ['proxy-'],
+            'strategy': {'type': 'leastPing'},
+          },
+        ],
+      },
+    };
+    final rust = jsonDecode(
+      adaptConfigForRust(
+        buildXrayConfig(
+          outbounds: [fallbackOutbound, primaryOutbound],
+          base: base,
+        ),
+      ),
+    ) as Map<String, dynamic>;
+
+    expect(rust.containsKey('domainMatcher'), isFalse);
+    expect(rust.containsKey('burstObservatory'), isFalse);
+
+    final routing = rust['routing'] as Map<String, dynamic>;
+    final balancer = (routing['balancers'] as List).single;
+    expect(balancer['tag'], 'balance');
+    // Rust получает панельный селектор и стратегию без изменений: выбор хоста
+    // идёт по той же логике, что и в Xray-core.
+    expect(balancer['selector'], ['proxy-']);
+    expect(balancer['fallbackTag'], 'proxy');
+    expect((balancer['strategy'] as Map)['type'], 'leastPing');
+    expect(
+      (routing['rules'] as List).any(
+        (rule) => rule['balancerTag'] == 'balance',
+      ),
+      isTrue,
+      reason: 'панельное правило не переводится на жёсткий outboundTag',
+    );
+
+    final observatory = rust['observatory'] as Map<String, dynamic>;
+    // Зонды идут по основным outbound'ам (proxy-2), а не по fallback (proxy),
+    // чтобы Rust не уходил в несовместимый fallback.
+    expect(observatory['subjectSelector'], ['proxy-2']);
+    expect(observatory['probeURL'], 'https://cp.cloudflare.com/generate_204');
+    expect(observatory['probeInterval'], '20s');
+  });
+
+  test('single outbound Rust config is not wrapped into a balancer', () {
+    final rust = jsonDecode(
+      adaptConfigForRust(buildXrayConfig(outbounds: [serverOutbound])),
+    ) as Map<String, dynamic>;
+
+    expect(rust.containsKey('observatory'), isFalse);
+    expect(rust.containsKey('burstObservatory'), isFalse);
+    expect((rust['routing'] as Map).containsKey('balancers'), isFalse);
+    expect((rust['routing'] as Map).containsKey('rules'), isTrue);
   });
 
 }

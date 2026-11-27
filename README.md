@@ -1,81 +1,79 @@
 # Curie
 
-Новый клиент Xray для Android, с поддержкой iOS позже. Сейчас проверяю приложение на
-устройстве, код доступен здесь и проект буду развивать.
+Xray-клиент для Android (iOS в планах). Исходный код открыт, проект активно развивается.
+Ядро Xray встроено в APK.
 
-Есть подписки с автообновлением, список узлов с пингом, раздельное туннелирование, журнал
-приложения и ядра Xray, русский и английский интерфейс. Ядро Xray вшито в APK — отдельно
-ничего ставить не нужно. Туннель продолжает работать в фоне, а проверки подписок и обновлений
-идут через него.
+## Скачать
 
-### Скачать
+[Последний релиз](https://github.com/WaylandX11/Curie/releases/latest) — универсальный APK для всех архитектур,
+а также отдельные сборки `arm64-v8a`, `armeabi-v7a`, `x86_64`, каждая с файлом `.sha256`.
+Приложение умеет проверять наличие новых версий в настройках («О приложении»).
 
-[Последний релиз](https://github.com/WaylandX11/Curie/releases/latest) — APK
-`universal` для всех архитектур и ABI-сборки `arm64-v8a`, `armeabi-v7a`, `x86_64`.
-Для каждой сборки есть файл `.sha256`. Проверить обновление можно прямо в приложении:
-«Настройки → О приложении → Проверить обновления».
+## Возможности
 
-История изменений — в [CHANGELOG.md](CHANGELOG.md).
+- Подключения: VLESS / VMess / Trojan / Shadowsocks / Hysteria2 и другие протоколы Xray.
+- Подписки (Remnawave, Marzban, 3x-ui и совместимые): добавление по ссылке или QR,
+  автообновление, трафик и срок действия.
+- TUN-режим и SOCKS5, раздельное туннелирование по приложениям.
+- Балансировка между серверами с failover (leastLoad / leastPing).
+- Экспериментальное Rust-ядро (xray-rust) — переключатель в настройках.
+- DNS из подписки, белые списки, geoip/geosite.
+- Журналы приложения и ядра, проверка соединения, пинг узлов.
+- Тёмная/светлая тема, русский и английский интерфейс.
 
-### FAQ
+## Сборка
 
-**Что это?**
+```powershell
+cd app
+flutter pub get
+flutter build apk --release --split-per-abi
+```
 
-Очередной клиент для Xray-подписок.
+APK появятся в `app/build/app/outputs/flutter-apk/`.
 
-**Зачем? Чем он лучше?**
+## Лицензия
 
-Создавался для себя — ради опыта, любопытства и интереса. Код открытый, приложение
-никуда ничего не отправляет, кроме HWID, который легко отключить. А ещё в нём есть
-экспериментальное ядро на Rust.
-
-**Фу, это вайбкод?**
-
-Да, даже скрывать не будем.
-
-**У меня что-то не работает**
-
-Пишите в [Issues](https://github.com/WaylandX11/Curie/issues), предлагайте —
-постараемся улучшить и починить. Пока что это хоумпроект.
-
-### Лицензия
-
-Исходники Curie — [Curie Source-Available License 1.0](LICENSE): можно изучать и
-использовать лично. Сторонние компоненты (Xray-core, Flutter и др.) описаны в
+Код Curie — [Curie Source-Available License 1.0](LICENSE). Сторонние компоненты
+(Xray-core, Flutter и др.) распространяются по своим лицензиям — см.
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 
 # Curie (English)
 
-A new Xray client for Android, with iOS planned. The source is available here and the
-project is under active development. Xray core is bundled into the APK.
+An Xray client for Android (iOS planned). Source available, actively developed.
+Xray core is bundled into the APK.
 
-[Download the latest release](https://github.com/WaylandX11/Curie/releases/latest):
-a `universal` APK for all architectures plus ABI builds for `arm64-v8a`, `armeabi-v7a`
-and `x86_64`, each with a `.sha256` checksum. The app can check for newer releases in
-Settings → About.
+## Download
 
-### FAQ
+[Latest release](https://github.com/WaylandX11/Curie/releases/latest) — a universal APK
+plus ABI builds for `arm64-v8a`, `armeabi-v7a`, `x86_64`, each with a `.sha256` checksum.
+The app can check for newer releases in Settings → About.
 
-**What is it?**
+## Features
 
-Just another client for Xray subscriptions.
+- Protocols: VLESS / VMess / Trojan / Shadowsocks / Hysteria2 and other Xray protocols.
+- Subscriptions (Remnawave, Marzban, 3x-ui compatible): add by URL or QR, auto-update,
+  traffic and expiry info.
+- TUN mode and SOCKS5, per-app routing.
+- Load balancing with failover (leastLoad / leastPing).
+- Experimental Rust core (xray-rust) — toggle in settings.
+- DNS from subscription, whitelists, geoip/geosite.
+- App and core logs, connection check, node ping.
+- Dark/light theme, Russian and English UI.
 
-**Why? What makes it better?**
+## Build
 
-I built it for myself — for the experience, out of curiosity and interest. The code is
-open, and the app sends nothing anywhere except HWID, which can be easily disabled.
-It also has an experimental Rust core.
+```powershell
+cd app
+flutter pub get
+flutter build apk --release --split-per-abi
+```
 
-**Ew, is this vibe-coded?**
+APKs land in `app/build/app/outputs/flutter-apk/`.
 
-Yes, and we're not even hiding it.
+## License
 
-**Something doesn't work for me**
-
-Open an [Issue](https://github.com/WaylandX11/Curie/issues) or suggest something —
-we'll try to improve and fix it. For now it's a home project.
-
-Curie source: [Curie Source-Available License 1.0](LICENSE). Third-party components are
-listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Curie code — [Curie Source-Available License 1.0](LICENSE). Third-party components
+(Xray-core, Flutter, etc.) keep their own licenses — see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -11,6 +11,10 @@
     <!-- Смена Wi-Fi/LTE: без него часть состояний сети проходит незамеченной. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Частичный wake lock: процесс не засыпает при выключенном экране. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Освобождение от оптимизации батареи (Doze). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Android 14+ требует тип для любого foreground-сервиса; для VPN это specialUse. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

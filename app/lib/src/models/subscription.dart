@@ -1,4 +1,5 @@
 import 'profile.dart';
+import 'settings.dart';
 
 /// Сведения о подписке, которые панель отдаёт в заголовках ответа
 /// (Remnawave, Marzneshin и совместимые).
@@ -144,12 +145,34 @@ class Subscription {
         .toString();
   }
 
-  /// `overrideHours` приходит из пользовательской настройки и важнее значения
-  /// панели (`profile-update-interval`).
-  bool isStale({int? overrideHours}) {
+  /// Иерархия интервала обновления:
+  ///   1. явная настройка пользователя (overrideHours, если отличается от
+  ///      значения по умолчанию);
+  ///   2. интервал из подписки (profile-update-interval);
+  ///   3. значение по умолчанию (12 ч).
+  bool isStale({int? userHours}) {
     if (updatedAt == null) return true;
-    final hours = overrideHours ?? updateIntervalHours;
+    int hours;
+    if (userHours != null &&
+        userHours > 0 &&
+        userHours != Settings.defaultSubscriptionUpdateHours) {
+      hours = userHours;
+    } else if (updateIntervalHours > 0) {
+      hours = updateIntervalHours;
+    } else {
+      hours = Settings.defaultSubscriptionUpdateHours;
+    }
     return DateTime.now().difference(updatedAt!).inHours >= hours;
+  }
+
+  /// Эффективный интервал обновления для отображения в UI.
+  int effectiveUpdateHours(int userHours) {
+    if (userHours > 0 &&
+        userHours != Settings.defaultSubscriptionUpdateHours) {
+      return userHours;
+    }
+    if (updateIntervalHours > 0) return updateIntervalHours;
+    return Settings.defaultSubscriptionUpdateHours;
   }
 
   /// Свежий узел панели + правка пользователя (если была).

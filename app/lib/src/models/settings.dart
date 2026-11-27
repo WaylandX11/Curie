@@ -53,6 +53,19 @@ String defaultSocksPassword() =>
 
 const String defaultSocksUsername = 'curie';
 
+/// Как показывать несколько подписок на главном экране.
+enum SubscriptionsLayout {
+  /// Листание: одна подписка на экран, переключение свайпом (как фото).
+  pager,
+  /// Все подписки друг за другом на одном экране.
+  list;
+
+  static SubscriptionsLayout fromName(String? name) =>
+      name == 'list' ? SubscriptionsLayout.list : SubscriptionsLayout.pager;
+
+  String get wireName => name;
+}
+
 /// Как приложения попадают в туннель.
 enum RoutingMode {
   /// Через прокси идёт всё.
@@ -158,8 +171,9 @@ enum XrayLogLevel {
 
 class Settings {
   /// Резервный DNS на случай, когда подписка не прислала свои серверы.
-  /// Само значение по умолчанию теперь — DNS из подписки (`dnsUsePanel`).
-  static const defaultDns = '77.88.8.8';
+  /// По умолчанию нейтральный публичный адрес; 77.88.8.8 (Яндекс) используется
+  /// только если пользователь выбрал его явно.
+  static const defaultDns = '8.8.8.8';
 
   /// Значение по умолчанию в старых версиях — нужно только для миграции.
   static const legacyDefaultDns = '1.1.1.1';
@@ -175,7 +189,7 @@ class Settings {
 
   /// Ручной интервал автообновления подписок. Панель всё равно сообщает свой
   /// `profile-update-interval`, но пользовательский выбор важнее.
-  static const defaultSubscriptionUpdateHours = 1;
+  static const defaultSubscriptionUpdateHours = 12;
   static const minSubscriptionUpdateHours = 1;
   static const maxSubscriptionUpdateHours = 168;
 
@@ -197,6 +211,7 @@ class Settings {
   const Settings({
     this.tunnelMode = TunnelMode.tun,
     this.useRustCore = false,
+    this.subscriptionsLayout = SubscriptionsLayout.list,
     this.routingMode = RoutingMode.all,
     this.allowedApps = const [],
     this.bypassedApps = const [],
@@ -241,6 +256,9 @@ class Settings {
   /// Экспериментальное Rust-ядро. По умолчанию выключено: обычные подключения
   /// идут через встроенный Xray-core из libXray.
   final bool useRustCore;
+
+  /// Как показывать несколько подписок на главном экране.
+  final SubscriptionsLayout subscriptionsLayout;
 
   final RoutingMode routingMode;
   final List<String> allowedApps;
@@ -336,6 +354,7 @@ class Settings {
   Settings copyWith({
     TunnelMode? tunnelMode,
     bool? useRustCore,
+    SubscriptionsLayout? subscriptionsLayout,
     RoutingMode? routingMode,
     List<String>? allowedApps,
     List<String>? bypassedApps,
@@ -377,6 +396,7 @@ class Settings {
   }) => Settings(
     tunnelMode: tunnelMode ?? this.tunnelMode,
     useRustCore: useRustCore ?? this.useRustCore,
+    subscriptionsLayout: subscriptionsLayout ?? this.subscriptionsLayout,
     routingMode: routingMode ?? this.routingMode,
     allowedApps: allowedApps ?? this.allowedApps,
     bypassedApps: bypassedApps ?? this.bypassedApps,
@@ -424,6 +444,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
     'tunnelMode': tunnelMode.wireName,
     'useRustCore': useRustCore,
+    'subscriptionsLayout': subscriptionsLayout.wireName,
     'routingMode': routingMode.name,
     'allowedApps': allowedApps,
     'bypassedApps': bypassedApps,
@@ -500,12 +521,16 @@ class Settings {
         savedDns == null ||
         savedDns.isEmpty ||
         legacyDefault ||
+        savedDns == '77.88.8.8' ||
         savedDns == defaultDns;
     final savedPort = (json['socksPort'] as num?)?.toInt();
     final savedPassword = json['socksPassword'] as String?;
     return Settings(
       tunnelMode: TunnelMode.fromName(json['tunnelMode'] as String?),
       useRustCore: (json['useRustCore'] as bool?) ?? false,
+      subscriptionsLayout: SubscriptionsLayout.fromName(
+        json['subscriptionsLayout'] as String?,
+      ),
       routingMode: RoutingMode.fromName(json['routingMode'] as String?),
       allowedApps: ((json['allowedApps'] as List?) ?? const []).cast<String>(),
       bypassedApps: ((json['bypassedApps'] as List?) ?? const [])

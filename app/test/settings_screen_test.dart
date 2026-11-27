@@ -35,7 +35,7 @@ void main() {
       findsNothing,
       reason: 'элементы управления живут внутри разделов, а не в меню',
     );
-    expect(find.text('Updated every 1 h'), findsOneWidget,
+    expect(find.text('Updated every 12 h'), findsOneWidget,
         reason: 'подпись раздела понятна, а не «Вкл 1»');
 
     await tester.tap(find.text('Connection'));

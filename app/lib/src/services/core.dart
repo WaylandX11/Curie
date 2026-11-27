@@ -6,6 +6,10 @@ import '../generated/core_info.dart';
 import 'store.dart';
 import 'xray.dart';
 
+/// Версия координаты `io.github.aimalygin:xray-rust-mobile` из build.gradle.kts.
+/// Показывается в «О приложении» даже когда активно Go-ядро.
+const String rustCoreVersionFallback = '0.10.1';
+
 /// Версия активного ядра. По умолчанию это libXray (Go), но если в
 /// «Экспериментальном» включено Rust-ядро, подпись и User-Agent должны
 /// показывать версию именно работающего ядра.
@@ -43,4 +47,14 @@ String coreLabel(String version, {bool? rust}) {
       .replaceFirst(RegExp(r'^v(?=\d)', caseSensitive: false), '');
   final name = (rust ?? rustCoreEnabled) ? 'xray-rust' : 'Xray';
   return '$name $clean'.trim();
+}
+
+/// Подпись версии Rust-ядра: «xray-rust 0.10.1» независимо от активного ядра.
+String rustCoreLabel(String version) {
+  final clean = version
+      .trim()
+      .replaceFirst(RegExp(r'^xray-rust\s+', caseSensitive: false), '')
+      .replaceFirst(RegExp(r'^rust\s+', caseSensitive: false), '')
+      .replaceFirst(RegExp(r'^v(?=\d)', caseSensitive: false), '');
+  return 'xray-rust ${clean.isEmpty ? rustCoreVersionFallback : clean}';
 }

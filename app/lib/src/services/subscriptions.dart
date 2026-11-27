@@ -19,7 +19,7 @@ class Subscriptions {
     final exists = Store.instance.state.value.subscriptions.any(
       (s) => s.url == trimmed,
     );
-    if (exists) return null;
+    if (exists) return const SubscriptionException('exists');
 
     final draft = Subscription(
       url: trimmed,
@@ -35,15 +35,29 @@ class Subscriptions {
         userAgent: await currentUserAgent(),
         proxyPort: Vpn.tunnelProxyPort,
       );
-      await Store.instance.update(
-        (state) =>
-            state.copyWith(subscriptions: [...state.subscriptions, loaded]),
-      );
+      final tunnelBusy =
+          Vpn.status.value == VpnStatus.connected ||
+          Vpn.status.value == VpnStatus.connecting;
+      await Store.instance.update((state) {
+        // Новая подписка сразу становится активной: иначе главный экран
+        // продолжает показывать первую подписку, и кажется, что добавленная
+        // «спряталась». На работающем туннеле не переключаем — иначе подпись
+        // показывала бы узел, к которому на самом деле не подключены.
+        final firstNode = loaded.nodes.isNotEmpty ? loaded.nodes.first.id : null;
+        return state.copyWith(
+          subscriptions: [...state.subscriptions, loaded],
+          selectedId: tunnelBusy ? state.selectedId : (firstNode ?? state.selectedId),
+        );
+      });
+      final total = Store.instance.state.value.subscriptions.length;
+      AppLog.add('subscription', 'добавлена: ${loaded.title} (всего: $total, url: ${loaded.url})');
       await GeoAssets.noteSubscription(loaded);
       return null;
     } on SubscriptionException catch (e) {
+      AppLog.add('subscription', 'add failed: ${e.code} ${e.detail ?? ''}'.trim());
       return e;
     } on Object catch (e) {
+      AppLog.add('subscription', 'add failed: network $e');
       return SubscriptionException('network', e.toString());
     }
   }
@@ -90,7 +104,7 @@ class Subscriptions {
   }) async {
     final errors = <SubscriptionException>[];
     for (final subscription in Store.instance.state.value.subscriptions) {
-      if (onlyStale && !subscription.isStale(overrideHours: intervalHours)) {
+      if (onlyStale && !subscription.isStale(userHours: intervalHours)) {
         continue;
       }
       final error = await refresh(subscription);

@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../models/app_state.dart';
 import '../models/profile.dart';
 import '../models/subscription.dart';
+import '../models/settings.dart';
 import '../services/app_log.dart';
 import '../services/connection.dart';
 import '../services/connection_check.dart';
@@ -32,6 +33,19 @@ import '../widgets/update_dialog.dart';
 import 'log_screen.dart';
 import 'subscriptions_screen.dart';
 
+/// Одна группа узлов на главном экране: либо ручные ссылки, либо подписка.
+class _HomeGroup {
+  const _HomeGroup({
+    required this.title,
+    required this.profiles,
+    this.subscription,
+  });
+
+  final String title;
+  final List<Profile> profiles;
+  final Subscription? subscription;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -45,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _coreVersion = '';
   bool _rustCore = rustCoreEnabled;
   VpnStatus _status = VpnStatus.disconnected;
+  PageController? _subscriptionPager;
 
   Timer? _ticker;
   Timer? _connectWatchdog;
@@ -63,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     GeoAssets.prompt.addListener(_onGeoPrompt);
     GeoAssets.restartRequested.addListener(_onGeoRestart);
     Store.instance.state.addListener(_onSettingsChanged);
+    Store.instance.state.addListener(_syncSubscriptionPage);
     _geoRestartSeen = GeoAssets.restartRequested.value;
     _loadVersions();
     _syncTimer();
@@ -81,6 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
     GeoAssets.prompt.removeListener(_onGeoPrompt);
     GeoAssets.restartRequested.removeListener(_onGeoRestart);
     Store.instance.state.removeListener(_onSettingsChanged);
+    Store.instance.state.removeListener(_syncSubscriptionPage);
+    _subscriptionPager?.dispose();
     _ticker?.cancel();
     _connectWatchdog?.cancel();
     super.dispose();
@@ -182,6 +200,24 @@ class _HomeScreenState extends State<HomeScreen> {
         _restartingGeo = false;
       }
     }());
+  }
+
+  void _syncSubscriptionPage() {
+    final state = Store.instance.state.value;
+    if (state.subscriptions.length <= 1 && state.profiles.isEmpty) return;
+    final groups = <_HomeGroup>[
+      if (state.profiles.isNotEmpty)
+        _HomeGroup(title: '', profiles: state.profiles, subscription: null),
+      for (final s in state.subscriptions)
+        _HomeGroup(title: s.title, profiles: s.nodes, subscription: s),
+    ];
+    if (groups.length <= 1) return;
+    final pager = _subscriptionPager;
+    if (pager == null || !pager.hasClients) return;
+    final idx = _activeGroupIndex(groups, state.selected).clamp(0, groups.length - 1);
+    if (pager.page?.round() != idx) {
+      pager.jumpToPage(idx);
+    }
   }
 
   void _onSettingsChanged() {
@@ -296,9 +332,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() => _busy = true);
     _armConnectWatchdog();
+    unawaited(Vpn.requestBatteryExemption());
     try {
       final outbounds = await outboundsFor(profile);
       final base = baseConfigOf(profile);
+      // DNS для TUN-интерфейса: если включён DNS из подписки и панель прислала
+      // свои серверы — берём первый из них, иначе — выбор пользователя.
+      // Иначе в логах всегда светится 77.88.8.8, даже когда он не выбран.
+      // Старое значение по умолчанию (77.88.8.8) больше не используем: если
+      // пользователь явно не выбирал DNS, берём нейтральный 8.8.8.8.
+      String effectiveDns = settings.dns == '77.88.8.8' ? '8.8.8.8' : settings.dns;
+      if (settings.dnsUsePanel && base != null) {
+        final panelDns = base['dns'];
+        if (panelDns is Map) {
+          final servers = panelDns['servers'];
+          if (servers is List && servers.isNotEmpty) {
+            final first = servers.first;
+            String? addr;
+            if (first is String) addr = first;
+            if (first is Map) addr = first['address'] as String?;
+            if (addr != null && addr.trim().isNotEmpty) effectiveDns = addr.trim();
+          }
+        }
+      }
       AppLog.add(
         'vpn',
         'подключение: ${profile.name} (outbound: ${outbounds.length}, routing: ${base?['routing'] != null})',
@@ -311,17 +367,19 @@ class _HomeScreenState extends State<HomeScreen> {
       final logPath = await CoreLog.ensurePath();
       final geoAssetDir = await GeoAssets.assetDirectory();
       _lastCheck = null;
+      final activeSettings = settings.copyWith(dns: effectiveDns);
+      final config = buildXrayConfig(
+        outbounds: outbounds,
+        settings: activeSettings,
+        base: base,
+        metricsPort: metricsPort,
+        checkPort: checkPort,
+        logPath: logPath,
+        geoAssetDir: geoAssetDir,
+      );
       await Vpn.connect(
-        config: buildXrayConfig(
-          outbounds: outbounds,
-          settings: settings,
-          base: base,
-          metricsPort: metricsPort,
-          checkPort: checkPort,
-          logPath: logPath,
-          geoAssetDir: geoAssetDir,
-        ),
-        settings: settings,
+        config: activeSettings.useRustCore ? adaptConfigForRust(config) : config,
+        settings: activeSettings,
         geoDir: geoAssetDir,
       );
     } on VpnException catch (e) {
@@ -340,6 +398,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Индекс активной подписки в списке (0, если ничего не выбрано).
+  int _activeGroupIndex(List<_HomeGroup> groups, Profile? selected) {
+    if (groups.isEmpty) return 0;
+    final url = selected?.subscriptionUrl;
+    if (url != null) {
+      for (var i = 0; i < groups.length; i++) {
+        if (groups[i].subscription?.url == url) return i;
+      }
+    }
+    // Ручные ссылки: если выбран профиль без subscriptionUrl, это первая группа.
+    if (selected != null && selected.subscriptionUrl == null && groups.isNotEmpty && groups.first.subscription == null) {
+      return 0;
+    }
+    return 0;
+  }
+
   Future<void> _select(Profile profile) async {
     // Плитки узлов остаются нажимаемыми во время подключения — не даём
     // вторая команда переподключения встать в очередь к первой.
@@ -353,6 +427,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Быстрое переключение между подписками: выбирает первый узел выбранной
+  /// подписки (как обычный выбор узла) и при активном туннеле переподключает.
   Future<void> _refresh(Subscription subscription) async {
     final l10n = AppLocalizations.of(context);
     final failure = await Subscriptions.refresh(subscription);
@@ -492,8 +568,27 @@ class _HomeScreenState extends State<HomeScreen> {
           valueListenable: Store.instance.state,
           builder: (context, state, _) {
             final selected = state.selected;
-            final subscription = _subscriptionOf(state, selected);
-            final group = subscription?.nodes ?? state.profiles;
+            // Группы узлов: ручные ссылки (если есть) + каждая подписка.
+            // Раньше ручные ссылки пропадали, как только активной становилась
+            // подписка — теперь они всегда видны отдельным блоком/страницей.
+            final groups = <_HomeGroup>[
+              if (state.profiles.isNotEmpty)
+                _HomeGroup(
+                  title: l10n.tr('manualLinks'),
+                  profiles: state.profiles,
+                  subscription: null,
+                ),
+              for (final s in state.subscriptions)
+                _HomeGroup(title: s.title, profiles: s.nodes, subscription: s),
+            ];
+            final activeIndex = _activeGroupIndex(groups, selected);
+            final subscription =
+                activeIndex >= 0 && activeIndex < groups.length
+                    ? groups[activeIndex].subscription
+                    : null;
+            final group = activeIndex >= 0 && activeIndex < groups.length
+                ? groups[activeIndex].profiles
+                : (state.profiles.isNotEmpty ? state.profiles : <Profile>[]);
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -505,39 +600,172 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _updateBanner(l10n, theme),
                 if (group.isNotEmpty) ...[
-                  Text(
-                    l10n.tr('currentProvider').toUpperCase(),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ProviderCard(
-                    profiles: group,
-                    selectedId: selected?.id,
-                    // Карточка показывает реально настроенный интервал, а не
-                    // рекомендацию панели — как и меню «Подключение».
-                    updateHours: state.settings.subscriptionUpdateHours,
-                    subscription: subscription,
-                    onSelect: _select,
-                    onRefresh: subscription == null
-                        ? null
-                        : () => _refresh(subscription),
-                    onPing: () => _ping(group),
-                    onManage: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const SubscriptionsScreen(),
+                  if (state.settings.subscriptionsLayout ==
+                          SubscriptionsLayout.list &&
+                      groups.length > 1) ...[
+                    // Режим «все на одном экране»: подписки идут друг за другом.
+                    for (final g in groups)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ProviderCard(
+                          profiles: g.profiles,
+                          selectedId: selected?.id,
+                          updateHours: g.subscription == null
+                              ? state.settings.subscriptionUpdateHours
+                              : g.subscription!.effectiveUpdateHours(
+                                  state.settings.subscriptionUpdateHours,
+                                ),
+                          subscription: g.subscription,
+                          onSelect: _select,
+                          onRefresh: g.subscription == null
+                              ? null
+                              : () => _refresh(g.subscription!),
+                          onPing: () => _ping(g.profiles),
+                          onManage: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const SubscriptionsScreen(),
+                            ),
+                          ),
+                          onEdit: _editProfile,
+                          expanded: g.subscription?.expanded,
+                          onExpandedChanged: g.subscription == null
+                              ? null
+                              : (value) => Subscriptions.setExpanded(
+                                  g.subscription!.url,
+                                  value,
+                                ),
+                        ),
+                      ),
+                  ] else if (groups.length > 1) ...[
+                    // Режим «листание»: одна подписка на экран, свайп влево/вправо.
+                    SizedBox(
+                      height: 24,
+                      child: Center(
+                        child: Text(
+                          '${_activeGroupIndex(groups, selected) + 1} / ${groups.length}',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
                     ),
-                    onEdit: _editProfile,
-                    expanded: subscription?.expanded,
-                    onExpandedChanged: subscription == null
-                        ? null
-                        : (value) => Subscriptions.setExpanded(
-                            subscription.url,
-                            value,
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height - 260,
+                      child: PageView.builder(
+                        controller: _subscriptionPager ??= PageController(
+                          initialPage: _activeGroupIndex(groups, selected).clamp(
+                            0,
+                            groups.length - 1,
                           ),
+                        ),
+                        itemCount: groups.length,
+                        onPageChanged: (index) {
+                          final g = groups[index];
+                          if (g.profiles.isEmpty) return;
+                          unawaited(_select(g.profiles.first));
+                        },
+                        itemBuilder: (context, index) {
+                          final g = groups[index];
+                          return SingleChildScrollView(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: ProviderCard(
+                              profiles: g.profiles,
+                              selectedId: selected?.id,
+                              updateHours: g.subscription == null
+                                  ? state.settings.subscriptionUpdateHours
+                                  : g.subscription!.effectiveUpdateHours(
+                                      state.settings.subscriptionUpdateHours,
+                                    ),
+                              subscription: g.subscription,
+                              onSelect: _select,
+                              onRefresh: g.subscription == null
+                                  ? null
+                                  : () => _refresh(g.subscription!),
+                              onPing: () => _ping(g.profiles),
+                              onManage: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const SubscriptionsScreen(),
+                                ),
+                              ),
+                              onEdit: _editProfile,
+                              expanded: g.subscription?.expanded,
+                              onExpandedChanged: g.subscription == null
+                                  ? null
+                                  : (value) => Subscriptions.setExpanded(
+                                      g.subscription!.url,
+                                      value,
+                                    ),
+                            ),
+                          ),
+                        );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (var i = 0; i < groups.length; i++)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: i == _activeGroupIndex(groups, selected)
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (groups.length <= 1) ...[
+                    ProviderCard(
+                      profiles: group,
+                      selectedId: selected?.id,
+                      // Карточка показывает реально настроенный интервал, а не
+                      // рекомендацию панели — как и меню «Подключение».
+                      updateHours: subscription == null
+                          ? state.settings.subscriptionUpdateHours
+                          : subscription.effectiveUpdateHours(
+                              state.settings.subscriptionUpdateHours,
+                            ),
+                      subscription: subscription,
+                      onSelect: _select,
+                      onRefresh: subscription == null
+                          ? null
+                          : () => _refresh(subscription),
+                      onPing: () => _ping(group),
+                      onManage: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SubscriptionsScreen(),
+                        ),
+                      ),
+                      onEdit: _editProfile,
+                      expanded: subscription?.expanded,
+                      onExpandedChanged: subscription == null
+                          ? null
+                          : (value) => Subscriptions.setExpanded(
+                              subscription.url,
+                              value,
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SubscriptionsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.subscriptions_outlined, size: 18),
+                      label: Text(l10n.tr('manageSubscriptions')),
+                    ),
                   ),
                 ] else ...[
                   Card(
@@ -590,19 +818,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  Subscription? _subscriptionOf(AppState state, Profile? selected) {
-    final url = selected?.subscriptionUrl;
-    if (url != null) {
-      for (final subscription in state.subscriptions) {
-        if (subscription.url == url) return subscription;
-      }
-      return null;
-    }
-    // Выбран узел, добавленный вручную, — показываем их группу, а не подписку.
-    if (state.profiles.isNotEmpty) return null;
-    return state.subscriptions.isEmpty ? null : state.subscriptions.first;
   }
 
   Widget _updateBanner(AppLocalizations l10n, ThemeData theme) {

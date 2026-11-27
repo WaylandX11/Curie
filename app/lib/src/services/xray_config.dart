@@ -470,5 +470,103 @@ String? _proxyTag(
   return null;
 }
 
+/// Минимальная адаптация конфига под xray-rust 0.10.1: убираем неподдерживаемые
+/// поля и переводим burstObservatory → observatory (для балансировок).
+///
+/// Селектор зондов строится из outbound'ов, исключая запасной хост
+/// (fallbackTag): зондировать fallback нет смысла — он не участвует в
+/// балансировке, а в несовместимом случае мог бы увести Rust в fallback.
+String adaptConfigForRust(String config) {
+  final decoded = jsonDecode(config);
+  if (decoded is! Map<String, dynamic>) return config;
+  final rust = <String, dynamic>{...decoded};
+
+  for (final key in const [
+    'metrics',
+    'stats',
+    'policy',
+    'env',
+    'burstObservatory',
+  ]) {
+    rust.remove(key);
+  }
+  _stripRustKeys(rust, const {'domainMatcher', 'burstObservatory'});
+
+  final panelBurst =
+      (decoded['burstObservatory'] as Map?)?.cast<String, dynamic>();
+  final panelObservatory =
+      (decoded['observatory'] as Map?)?.cast<String, dynamic>();
+
+  if (panelBurst == null && panelObservatory == null) {
+    return jsonEncode(rust);
+  }
+
+  final ping = (panelBurst?['pingConfig'] as Map?)?.cast<String, dynamic>() ??
+      <String, dynamic>{};
+  var probeInterval = (panelBurst?['probeInterval'] as String?)?.trim() ?? '';
+  if (probeInterval.isEmpty) {
+    probeInterval = (ping['interval'] as String?)?.trim() ?? '';
+  }
+  if (panelBurst == null) {
+    probeInterval = (panelObservatory?['probeInterval'] as String?)?.trim() ??
+        probeInterval;
+  }
+  if (!RegExp(r'^\d+(\.\d+)?(ns|us|ms|s|m|h)$').hasMatch(probeInterval)) {
+    probeInterval = '30s';
+  }
+
+  final probeUrl = (panelObservatory?['probeURL'] as String?)?.trim();
+  final effectiveProbeUrl =
+      (probeUrl == null || probeUrl.isEmpty)
+          ? 'https://cp.cloudflare.com/generate_204'
+          : probeUrl;
+
+  // Селектор рабочих узлов: все прокси минус запасные (fallbackTag).
+  final outbounds = (rust['outbounds'] as List?)
+          ?.whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList() ??
+      const <Map<String, dynamic>>[];
+  final proxies = Servers.proxies(outbounds);
+  final fallbacks = Servers.allFallbackTags(proxies, decoded);
+  var subjects = [
+    for (final outbound in proxies)
+      if (!fallbacks.contains(Servers.tag(outbound))) Servers.tag(outbound),
+  ].whereType<String>().toList();
+  if (subjects.isEmpty) {
+    final fromBurst =
+        (panelBurst?['subjectSelector'] as List?)?.whereType<String>().toList();
+    final fromObservatory =
+        (panelObservatory?['subjectSelector'] as List?)?.whereType<String>().toList();
+    subjects = fromBurst ?? fromObservatory ?? const <String>[];
+  }
+
+  rust['observatory'] = <String, dynamic>{
+    'subjectSelector': subjects,
+    'probeURL': effectiveProbeUrl,
+    'probeInterval': probeInterval,
+    'enableConcurrency': true,
+  };
+
+  return jsonEncode(rust);
+}
+
+void _stripRustKeys(Object? node, Set<String> keys) {
+  if (node is Map) {
+    final iterator = node.keys.toList();
+    for (final key in iterator) {
+      if (keys.contains(key)) {
+        node.remove(key);
+        continue;
+      }
+      _stripRustKeys(node[key], keys);
+    }
+  } else if (node is List) {
+    for (final value in node) {
+      _stripRustKeys(value, keys);
+    }
+  }
+}
+
 bool _hasTag(List<Map<String, dynamic>> outbounds, String tag) =>
     outbounds.any((outbound) => outbound['tag'] == tag);

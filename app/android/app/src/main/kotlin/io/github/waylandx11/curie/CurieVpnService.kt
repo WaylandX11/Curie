@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.SystemClock
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -110,11 +111,12 @@ class CurieVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var sessionConfig: String? = null
     private var failures = 0
-    private var currentDns = "77.88.8.8"
+    private var currentDns = "8.8.8.8"
     private var currentTunnelMode = "tun"
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var lastNetworkChangeMs = 0L
     private var directInternetNotified = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // Номер последней команды: задача из очереди не меняет состояние, если
     // пока она ждала, пришла новая команда (например, смена узла).
@@ -137,7 +139,7 @@ class CurieVpnService : VpnService() {
                 val id = generation.incrementAndGet()
                 val session = SavedSession(
                     config = config,
-                    dns = intent.getStringExtra(EXTRA_DNS) ?: "77.88.8.8",
+                    dns = intent.getStringExtra(EXTRA_DNS) ?: "8.8.8.8",
                     mtu = intent.getIntExtra(EXTRA_MTU, 1500),
                     tunnelMode = intent.getStringExtra(EXTRA_TUNNEL_MODE) ?: "tun",
                     mode = intent.getStringExtra(EXTRA_MODE) ?: "all",
@@ -235,6 +237,7 @@ class CurieVpnService : VpnService() {
             val (metrics, check) = parsePorts(session.config)
             CurieBridge.setSession(metrics, check)
             registerNetworkCallback()
+            acquireWakeLock()
             startWatchdog(check, id)
 
             updateNotification(getString(R.string.vpn_connected))
@@ -355,8 +358,12 @@ class CurieVpnService : VpnService() {
         runCatching { XrayBridge.invoke("stopXray", JSONObject()) }
         val error = runCatching { startCore(config, fd) }.exceptionOrNull()
         if (error != null) {
+            // Не рвём туннель из-за одной неудачной попытки: после долгого
+            // простоя сеть ещё не восстановилась. Следующий цикл сторожа
+            // попробует снова; окончательно падаем только после повторных
+            // неудач.
             CurieBridge.log("перезапуск ядра не удался: ${error.message}")
-            failTunnel(id, "перезапуск ядра не удался: ${error.message ?: "без ошибки"}")
+            failures = 1
         }
     }
 
@@ -511,6 +518,7 @@ class CurieVpnService : VpnService() {
 
     private fun teardown() {
         stopWatchdog()
+        releaseWakeLock()
         unregisterNetworkCallback()
         runCatching { XrayBridge.invoke("stopXray", JSONObject()) }
         runCatching { LibXray.resetDNS() }
@@ -520,6 +528,20 @@ class CurieVpnService : VpnService() {
         failures = 0
         directInternetNotified = false
         CurieBridge.clearSession()
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Curie:Vpn").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { wakeLock?.release() }
+        wakeLock = null
     }
 
     private fun saveSession(session: SavedSession) {
@@ -546,7 +568,7 @@ class CurieVpnService : VpnService() {
         val config = runCatching { decryptConfig(encrypted) }.getOrNull() ?: return null
         return SavedSession(
             config = config,
-            dns = prefs.getString(KEY_DNS, null) ?: "77.88.8.8",
+            dns = prefs.getString(KEY_DNS, null) ?: "8.8.8.8",
             mtu = prefs.getInt(KEY_MTU, 1500),
             tunnelMode = prefs.getString(KEY_TUNNEL_MODE, null) ?: "tun",
             mode = prefs.getString(KEY_MODE, null) ?: "all",

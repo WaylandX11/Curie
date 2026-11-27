@@ -205,9 +205,9 @@ not a link
     final older = updated.copyWith(
       updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
     );
-    expect(older.isStale(overrideHours: 1), isTrue);
-    expect(older.isStale(overrideHours: 12), isFalse);
-    expect(old.isStale(overrideHours: 24), isFalse);
+    expect(older.isStale(userHours: 1), isTrue);
+    expect(older.isStale(userHours: 12), isFalse);
+    expect(old.isStale(userHours: 24), isFalse);
   });
 
   test('subscription survives a storage round trip', () {

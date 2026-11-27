@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import android.os.PowerManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -83,9 +84,11 @@ class CurieRustVpnService : XrayVpnService() {
         fun version(): String = AAR_VERSION
 
         /**
-         * Убираем то, что относится к Go-ядру и его локальным сервисам.
-         * Rust-библиотека сама владеет TUN и не понимает `metrics`, `stats`,
-         * `policy`, `xray.tun.fd` и часть полей сниффинга.
+         * Убираем только то, что относится к Go-ядру и его локальным сервисам.
+         * Селекторы, стратегии и `fallbackTag` остаются панельными — Rust
+         * 0.10.1 понимает их нативно, поэтому правила с `balancerTag` здесь
+         * трогать нельзя. Dart лишь заменяет неподдерживаемый
+         * `burstObservatory` на обычный `observatory`.
          */
         fun sanitizeConfig(raw: String): String {
             val json = JSONObject(raw)
@@ -97,7 +100,8 @@ class CurieRustVpnService : XrayVpnService() {
             // Rust-ядро принимает не все поля панели: эти два она отвергает
             // как неизвестные ещё до запуска. Убираем их везде, включая
             // вложенные объекты.
-            stripKeys(json, setOf("burstObservatory", "domainMatcher"))
+            // `domainMatcher` Rust отвергает как неизвестное ещё до запуска.
+            stripKeys(json, setOf("domainMatcher"))
 
             val inbounds = json.optJSONArray("inbounds") ?: JSONArray()
             val kept = JSONArray()
@@ -117,59 +121,7 @@ class CurieRustVpnService : XrayVpnService() {
             }
             json.put("inbounds", kept)
 
-            // Балансеры панели зависят от observatory, которого в схеме Rust нет.
-            // В экспериментальном режиме ведём весь трафик через основной outbound
-            // выбранного узла: проверка и TUN идут по одному рабочему пути.
-            val primary = primaryProxyTag(json)
-            val rules = json.optJSONObject("routing")?.optJSONArray("rules")
-            if (rules != null && primary.isNotEmpty()) {
-                for (i in 0 until rules.length()) {
-                    val rule = rules.optJSONObject(i) ?: continue
-                    if (!rule.has("balancerTag")) continue
-                    rule.remove("balancerTag")
-                    rule.put("outboundTag", primary)
-                }
-            }
-
             return json.toString()
-        }
-
-        /// Повторяет Servers._proxyTag из Dart: в панелях Remnawave первый узел
-        /// (`proxy`) — запасной, рабочие — `proxy-2`, `proxy-3`. Отправить проверку
-        /// через запасной — значит получить обрыв, когда основной доступен.
-        private fun primaryProxyTag(json: JSONObject): String {
-            val outbounds = json.optJSONArray("outbounds") ?: return ""
-            val proxyProtocols = setOf(
-                "vless", "vmess", "trojan", "shadowsocks", "socks", "http",
-                "hysteria", "wireguard",
-            )
-            val proxies = mutableListOf<Pair<String, String>>()
-            for (i in 0 until outbounds.length()) {
-                val outbound = outbounds.optJSONObject(i) ?: continue
-                val tag = outbound.optString("tag")
-                val protocol = outbound.optString("protocol").lowercase()
-                if (tag.isNotEmpty() && protocol in proxyProtocols) {
-                    proxies += tag to protocol
-                }
-            }
-            if (proxies.isEmpty()) return ""
-
-            val fallback = mutableSetOf<String>()
-            val balancers = json.optJSONObject("routing")?.optJSONArray("balancers")
-            if (balancers != null) {
-                for (i in 0 until balancers.length()) {
-                    val tag = balancers.optJSONObject(i)?.optString("fallbackTag")
-                    if (!tag.isNullOrEmpty()) fallback += tag
-                }
-            }
-            // Соглашение Remnawave: тег с пронумерованными «братьями» — запасной.
-            for ((tag, _) in proxies) {
-                if (proxies.any { (other, _) -> other != tag && other.startsWith("$tag-") }) {
-                    fallback += tag
-                }
-            }
-            return proxies.firstOrNull { (tag, _) -> tag !in fallback }?.first
-                ?: proxies.first().first
         }
 
         /** Порт локального check-прокси из конфига, 0 если его нет. */
@@ -221,7 +173,7 @@ class CurieRustVpnService : XrayVpnService() {
         val geoDir: String
     )
 
-    private var currentDns = "77.88.8.8"
+    private var currentDns = "8.8.8.8"
     private var currentMtu = 1500
     private var currentMode = "all"
     private var currentAllowed = emptyList<String>()
@@ -236,6 +188,21 @@ class CurieRustVpnService : XrayVpnService() {
      */
     @Volatile
     private var startPending = false
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Curie:RustVpn").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching { wakeLock?.release() }
+        wakeLock = null
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -252,6 +219,7 @@ class CurieRustVpnService : XrayVpnService() {
     }.getOrDefault(mapOf("up" to 0L, "down" to 0L))
 
     override fun onDestroy() {
+        releaseWakeLock()
         if (active === this) active = null
         super.onDestroy()
     }
@@ -266,7 +234,7 @@ class CurieRustVpnService : XrayVpnService() {
                 }
                 val session = SavedSession(
                     config = raw,
-                    dns = intent.getStringExtra(EXTRA_DNS) ?: "77.88.8.8",
+                    dns = intent.getStringExtra(EXTRA_DNS) ?: "8.8.8.8",
                     mtu = intent.getIntExtra(EXTRA_MTU, 1500),
                     mode = intent.getStringExtra(EXTRA_MODE) ?: "all",
                     allowed = (intent.getStringArrayListExtra(EXTRA_ALLOWED) ?: arrayListOf()).toSet(),
@@ -288,6 +256,7 @@ class CurieRustVpnService : XrayVpnService() {
                 CurieBridge.clearSession()
                 CurieBridge.emit(CurieBridge.STATUS_DISCONNECTED)
                 stopForegroundIfNeeded()
+                releaseWakeLock()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -304,6 +273,7 @@ class CurieRustVpnService : XrayVpnService() {
     }
 
     private fun connect(session: SavedSession) {
+        acquireWakeLock()
         currentDns = session.dns
         currentMtu = session.mtu
         currentMode = session.mode
@@ -562,7 +532,7 @@ class CurieRustVpnService : XrayVpnService() {
         val config = runCatching { decryptConfig(encrypted) }.getOrNull() ?: return null
         return SavedSession(
             config = config,
-            dns = prefs.getString(KEY_DNS, null) ?: "77.88.8.8",
+            dns = prefs.getString(KEY_DNS, null) ?: "8.8.8.8",
             mtu = prefs.getInt(KEY_MTU, 1500),
             mode = prefs.getString(KEY_MODE, null) ?: "all",
             allowed = prefs.getStringSet(KEY_ALLOWED, emptySet()) ?: emptySet(),

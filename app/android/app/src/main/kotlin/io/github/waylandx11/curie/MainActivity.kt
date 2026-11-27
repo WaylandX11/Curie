@@ -13,6 +13,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -133,6 +134,14 @@ class MainActivity : FlutterActivity() {
                 // Накопительные счётчики Rust-ядра. Показываются вместо
                 // HTTP-метрик libXray, когда включён experimental-режим.
                 "rustTraffic" -> result.success(CurieRustVpnService.currentTraffic())
+
+                // Один раз просим освободить приложение от оптимизации батареи:
+                // иначе Doze режет сеть фонового туннеля и связь рвётся при
+                // долгом простое телефона. Повторно не спрашиваем.
+                "requestBatteryExemption" -> {
+                    requestBatteryExemption()
+                    result.success(null)
+                }
 
                 "status" -> result.success(
                     HashMap<String, Any?>().apply {
@@ -293,7 +302,7 @@ class MainActivity : FlutterActivity() {
                 CurieVpnService.EXTRA_GEO_DIR,
                 args["geoDir"] as? String ?: "",
             )
-            putExtra(CurieVpnService.EXTRA_DNS, (args["dns"] as? String) ?: "77.88.8.8")
+            putExtra(CurieVpnService.EXTRA_DNS, (args["dns"] as? String) ?: "8.8.8.8")
             putExtra(CurieVpnService.EXTRA_MTU, (args["mtu"] as? Int) ?: 1500)
             putExtra(CurieVpnService.EXTRA_MODE, (args["mode"] as? String) ?: "all")
             putExtra(
@@ -389,6 +398,21 @@ class MainActivity : FlutterActivity() {
             return
         }
         super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    private fun requestBatteryExemption() {
+        val prefs = getSharedPreferences("curie_battery", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("asked", false)) return
+        prefs.edit().putBoolean("asked", true).apply()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        if (pm?.isIgnoringBatteryOptimizations(packageName) == true) return
+        runCatching {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+            startActivity(intent)
+        }
     }
 
     /** Есть ли безлимитная сеть мимо собственного VPN. */

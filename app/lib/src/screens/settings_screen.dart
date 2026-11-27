@@ -1051,6 +1051,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.tr('sectionAppearance'))),
       body: SafeArea(
@@ -1083,6 +1084,52 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                ValueListenableBuilder<AppState>(
+                    valueListenable: Store.instance.state,
+                    builder: (context, state, _) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.tr('displayMode'),
+                            style: theme.textTheme.labelMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          SegmentedButton<SubscriptionsLayout>(
+                            segments: [
+                              ButtonSegment(
+                                value: SubscriptionsLayout.pager,
+                                icon: const Icon(Icons.view_carousel_outlined, size: 16),
+                                label: Text(l10n.tr('displayPager')),
+                              ),
+                              ButtonSegment(
+                                value: SubscriptionsLayout.list,
+                                icon: const Icon(Icons.view_agenda_outlined, size: 16),
+                                label: Text(l10n.tr('displayList')),
+                              ),
+                            ],
+                            selected: {state.settings.subscriptionsLayout},
+                            onSelectionChanged: (value) {
+                              if (value.isEmpty) return;
+                              unawaited(
+                                Store.instance.update(
+                                  (s) => s.copyWith(
+                                    settings: s.settings.copyWith(
+                                      subscriptionsLayout: value.first,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ValueListenableBuilder<Locale?>(
                   valueListenable: LocaleController.locale,
                   builder: (context, locale, _) => RadioGroup<String>(
@@ -1368,6 +1415,14 @@ class _AboutTilesState extends State<_AboutTiles> {
                 leading: const Icon(Icons.memory),
                 title: Text(l10n.tr('coreVersion')),
                 subtitle: Text(coreLabel(snapshot.data ?? libXrayVersion)),
+              ),
+            ),
+            FutureBuilder<String>(
+              future: rustCoreVersion(),
+              builder: (context, snapshot) => ListTile(
+                leading: const Icon(Icons.memory),
+                title: Text(l10n.tr('rustCoreVersion')),
+                subtitle: Text(rustCoreLabel(snapshot.data ?? '')),
               ),
             ),
             ListTile(

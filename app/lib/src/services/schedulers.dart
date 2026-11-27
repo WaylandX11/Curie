@@ -81,7 +81,7 @@ class CurieSchedulers {
       if (!force && !settings.autoUpdateSubscriptions) return;
       final due = Store.instance.state.value.subscriptions
           .where(
-            (s) => s.isStale(overrideHours: settings.subscriptionUpdateHours),
+            (s) => s.isStale(userHours: settings.subscriptionUpdateHours),
           )
           .length;
       if (due == 0) return;

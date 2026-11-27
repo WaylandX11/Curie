@@ -42,14 +42,19 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     final failure = await Subscriptions.add(url, title ?? '');
     if (!mounted) return;
     setState(() => _busy = false);
-    showMessage(
-      context,
-      failure == null
-          ? l10n.tr('subscriptionAdded')
-          : l10n.fmt('subscriptionFailed', {
-              'error': subscriptionErrorText(l10n, failure.code, failure.detail),
-            }),
-    );
+    if (!mounted) return;
+    if (failure == null) {
+      showMessage(context, l10n.tr('subscriptionAdded'));
+    } else if (failure.code == 'exists') {
+      showMessage(context, l10n.tr('subscriptionAlreadyAdded'));
+    } else {
+      showMessage(
+        context,
+        l10n.fmt('subscriptionFailed', {
+          'error': subscriptionErrorText(l10n, failure.code, failure.detail),
+        }),
+      );
+    }
   }
 
   Future<void> _refresh(Subscription subscription) async {
@@ -138,7 +143,9 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
                   _card(
                     context,
                     subscription,
-                    state.settings.subscriptionUpdateHours,
+                    subscription.effectiveUpdateHours(
+                      state.settings.subscriptionUpdateHours,
+                    ),
                   ),
               ],
             );

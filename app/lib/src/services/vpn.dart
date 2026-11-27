@@ -127,6 +127,16 @@ class Vpn {
 
   static Future<void> disconnect() => _channel.invokeMethod<void>('disconnect');
 
+  /// Просим систему освободить приложение от оптимизации батареи: один раз,
+  /// чтобы Doze не резал сеть туннеля при долгом простое телефона.
+  static Future<void> requestBatteryExemption() async {
+    try {
+      await _channel.invokeMethod<void>('requestBatteryExemption');
+    } on Object {
+      // Не критично: без этого туннель может работать хуже в фоне, но не ломается.
+    }
+  }
+
   static VpnStatus _statusFromName(String? name) => switch (name) {
     'connecting' => VpnStatus.connecting,
     'connected' => VpnStatus.connected,
