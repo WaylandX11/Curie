@@ -1,7 +1,7 @@
 name: curie
 description: "Curie — Xray client for Android (iOS planned)."
 publish_to: 'none'
-version: 26.11.27+3632452
+version: 26.11.27+3632481
 
 environment:
   sdk: ^3.14.0
